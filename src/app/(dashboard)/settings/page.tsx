@@ -1,5 +1,8 @@
-import { PlaceholderPage } from "@/components/placeholder-page";
+import type { Metadata } from "next";
+import { SettingsScreen } from "./settings-screen";
+
+export const metadata: Metadata = { title: "Settings" };
 
 export default function SettingsPage() {
-  return <PlaceholderPage title="Settings" phase="Phase 1 (Auth + Settings)" />;
+  return <SettingsScreen />;
 }

@@ -1,6 +1,6 @@
 // Prisma mirrors the SQL migrations in db/migrations/ (the contract).
-// After adding a migration, run `npm run db:migrate` then `npm run db:pull`
-// (+ re-add Prisma-level annotations) or update the models here to match.
+// After adding a migration, run `npm run db:migrate`, then keep these models
+// in sync by hand (annotations like @updatedAt live only here).
 
 generator client {
   provider = "prisma-client-js"
@@ -9,4 +9,34 @@ generator client {
 datasource db {
   provider = "postgresql"
   url      = env("DATABASE_URL")
+}
+
+// ---- 0001_users_and_settings ----
+
+model User {
+  id          String        @id @db.Uuid
+  email       String        @unique @db.Citext
+  displayName String        @map("display_name")
+  role        String        @default("admin")
+  status      String        @default("active")
+  timezone    String        @default("Europe/London")
+  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  settings    UserSettings?
+
+  @@map("users")
+}
+
+model UserSettings {
+  userId               String   @id @map("user_id") @db.Uuid
+  defaultLeadDays      Int[]    @default([60, 30, 7]) @map("default_lead_days")
+  rentOverdueGraceDays Int      @default(3) @map("rent_overdue_grace_days")
+  emailEnabled         Boolean  @default(true) @map("email_enabled")
+  clausePetsDefault    Boolean  @default(false) @map("clause_pets_default")
+  clauseGardenDefault  Boolean  @default(false) @map("clause_garden_default")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
 }

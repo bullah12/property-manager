@@ -8,7 +8,7 @@ every phase.
 | Phase | Deliverable | Status | Proof | Deviation from PLAN.md |
 |---|---|---|---|---|
 | 0 | Scaffold + CI | ✅ green | ✅ see below | Local Supabase stack composed directly from upstream images (no Supabase CLI) — see Decisions D1 |
-| 1 | Auth + settings | — | — | — |
+| 1 | Auth + settings | ✅ green | ✅ see below | — |
 | 2 | Properties | — | — | — |
 | 3 | Tenants & tenancies | — | — | — |
 | 4 | File uploads + contract upload | — | — | — |
@@ -78,6 +78,37 @@ HTTP/1.1 200 OK
 x-request-id: c5b663ca-6f6e-4ee3-a36b-9ec706c9a0bf
 {"data":{"status":"ok","version":"v1","time":"2026-07-18T01:47:48.342Z"}}
 ```
+
+### Phase 1 — Auth + Settings
+
+Migration: `db/migrations/0001_users_and_settings.sql` (users + user_settings,
+verbatim from PLAN.md §3). Supabase Auth email+password via `@supabase/ssr`
+(session cookie, middleware refresh + page-level login redirect);
+`requireAuth` = session → users row → `status='active'` check; login/logout
+routes + login page; `GET /api/v1/me`, `PATCH /api/v1/settings`; Settings
+screen (react-hook-form + Zod); seeded admin (`admin@example.com`) and a
+suspended user. typecheck/lint/build: all green.
+
+Proof (2026-07-18, `npm run start` + curl):
+
+```
+POST /api/v1/auth/login {admin@example.com}            → {"data":{"loggedIn":true}}
+GET  /api/v1/me (admin cookie)                         → 200 user+settings envelope
+  {"data":{"user":{"email":"admin@example.com","role":"admin","status":"active",
+   "timezone":"Europe/London",…},"settings":{"defaultLeadDays":[60,30,7],
+   "rentOverdueGraceDays":3,…}}}
+POST /api/v1/auth/login {suspended@example.com}        → {"data":{"loggedIn":true}}
+GET  /api/v1/me (suspended cookie — valid session)     → 403
+  {"error":{"code":"FORBIDDEN","message":"Account is not active"}}
+GET  /api/v1/me (no cookie)                            → 401 UNAUTHENTICATED
+PATCH /api/v1/settings {rentOverdueGraceDays:5,defaultLeadDays:[7,30,90]}
+  → 200, lead days normalised to [90,30,7]
+PATCH /api/v1/settings {rentOverdueGraceDays:-1}       → 400 VALIDATION_ERROR envelope
+GET  /settings unauthenticated                         → 307 → /login
+```
+**PASS**
+
+### Phase 0 — details
 
 Scaffolded: Next.js 15 App Router + TS strict + Tailwind v4 + shadcn/ui;
 Prisma 6 initialised (empty schema, mirrors SQL migrations); forward-only SQL
