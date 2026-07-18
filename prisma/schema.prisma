@@ -1,0 +1,12 @@
+// Prisma mirrors the SQL migrations in db/migrations/ (the contract).
+// After adding a migration, run `npm run db:migrate` then `npm run db:pull`
+// (+ re-add Prisma-level annotations) or update the models here to match.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}

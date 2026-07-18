@@ -1,0 +1,88 @@
+# PROGRESS — Property Management Dashboard build log
+
+Running log of the autonomous build (PLAN.md §7 phases 0–9). Updated after
+every phase.
+
+## Phase status
+
+| Phase | Deliverable | Status | Proof | Deviation from PLAN.md |
+|---|---|---|---|---|
+| 0 | Scaffold + CI | ✅ green | ✅ see below | Local Supabase stack composed directly from upstream images (no Supabase CLI) — see Decisions D1 |
+| 1 | Auth + settings | — | — | — |
+| 2 | Properties | — | — | — |
+| 3 | Tenants & tenancies | — | — | — |
+| 4 | File uploads + contract upload | — | — | — |
+| 5 | Expenses | — | — | — |
+| 6 | Monthly Income + Overview | — | — | — |
+| 7 | Compliance + reminders data | — | — | — |
+| 8 | Notification engine | — | — | — |
+| 9 | Auto contract generation | — | — | — |
+
+## Decisions
+
+- **D1 — Local Supabase without the CLI.** This build environment's network
+  proxy blocks GitHub release downloads (only this repo is in scope), so the
+  Supabase CLI binary cannot be installed. Docker works, so
+  `docker/docker-compose.yml` runs the same stack `supabase start` would:
+  `supabase/postgres` (:54322), GoTrue auth, PostgREST, `storage-api`
+  (file-backed), and Kong (:54321) routing `/auth/v1`, `/rest/v1`,
+  `/storage/v1`. The app-facing contract (SUPABASE_URL + anon/service keys,
+  `@supabase/ssr`, storage API) is identical to CLI-local Supabase, and the
+  well-known `supabase-demo` local JWT keys are used (dev-only, not secrets).
+- **D2 — No Google-hosted fonts.** create-next-app's Geist import fetches
+  from Google at build time, which this sandbox (and any offline CI) can't
+  rely on. The app uses the system font stack instead.
+- All PLAN.md §8 items adopted as resolved per the build instructions:
+  Next.js+Prisma+Supabase (Q1); Stripe/bank-CSV/e-sign out (Q2); UK defaults
+  (Q3); no tenant portal, role column unused (Q4); 3-day rent grace (Q12);
+  recurrence rolls from completed_on on the same row (Q7); deposit_scheme
+  free text (Q8); single-occupancy tenancies (Q13).
+
+## Blocked / needs me
+
+- Nothing blocking. Notes for later phases:
+  - **Resend (Phase 8):** will run in mock mode (logs payloads). Add a real
+    `RESEND_API_KEY` to `.env` to send real email.
+
+## How to run locally
+
+```bash
+npm install
+cp .env.example .env          # local-dev values work as-is
+./scripts/dev-bootstrap.sh    # starts docker stack, migrates, seeds
+npm run dev                   # app on http://localhost:3000
+```
+
+Individual pieces: `npm run db:start` / `db:stop` / `db:nuke` (drop volumes),
+`npm run db:migrate`, `npm run db:seed`, `npm run typecheck|lint|build`.
+Log in as the seeded admin (from Phase 1 onward): `admin@example.com` /
+`admin-password-123` (see `SEED_ADMIN_*` in `.env.example`).
+
+## Proof log
+
+### Phase 0 — Scaffold + CI
+
+Commands and results (2026-07-18):
+
+```
+$ npm run typecheck   # tsc --noEmit → clean
+$ npm run lint        # eslint . → clean
+$ npm run build       # next build → ✓ Compiled successfully; 10 routes
+$ npm run db:migrate  # Already up to date. (runner + schema_migrations work)
+
+$ docker compose -f docker/docker-compose.yml ps
+  db (healthy) · auth (healthy) · rest (up) · storage (healthy) · kong (healthy)
+
+$ curl -si http://localhost:3000/api/v1/health
+HTTP/1.1 200 OK
+x-request-id: c5b663ca-6f6e-4ee3-a36b-9ec706c9a0bf
+{"data":{"status":"ok","version":"v1","time":"2026-07-18T01:47:48.342Z"}}
+```
+
+Scaffolded: Next.js 15 App Router + TS strict + Tailwind v4 + shadcn/ui;
+Prisma 6 initialised (empty schema, mirrors SQL migrations); forward-only SQL
+migration runner (`db/migrations/NNNN_*.sql` → `schema_migrations`); shared
+API layer (envelope, stable error codes, `X-Request-Id`, Zod edge validation);
+app shell (config-driven sidebar, topbar, toaster, error boundaries, mobile
+drawer) with placeholder pages; `GET /api/v1/health`; GitHub Actions CI
+(typecheck + lint + build). **PASS**
