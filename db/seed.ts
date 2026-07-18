@@ -117,6 +117,7 @@ export const SEED_IDS = {
   contractMapleSuperseded: "55555555-5555-4555-8555-555555555502",
   contractQuayDraft: "55555555-5555-4555-8555-555555555503",
   contractQuayIssued: "55555555-5555-4555-8555-555555555504",
+  fileReceiptBoiler: "44444444-4444-4444-8444-444444444405",
 };
 
 async function seedProperties() {
@@ -415,11 +416,89 @@ async function seedContracts(adminId: string) {
   console.log("Seeded 4 files + 4 contracts (draft/issued/signed/superseded)");
 }
 
+async function seedExpenses(adminId: string) {
+  // One receipt file in storage, attached to the boiler repair.
+  const receiptPdf = makePdf("Receipt - PlumbCo boiler repair - 180.00 GBP");
+  const receiptKey = `receipt/${SEED_IDS.fileReceiptBoiler}/plumbco-boiler-receipt.pdf`;
+  const { error } = await supabaseAdmin.storage
+    .from(STORAGE_BUCKET)
+    .upload(receiptKey, receiptPdf, { contentType: "application/pdf", upsert: true });
+  if (error) throw new Error(`receipt upload failed: ${error.message}`);
+  await prisma.file.upsert({
+    where: { id: SEED_IDS.fileReceiptBoiler },
+    update: { status: "ready" },
+    create: {
+      id: SEED_IDS.fileReceiptBoiler,
+      ownerId: adminId,
+      purpose: "receipt",
+      storageKey: receiptKey,
+      contentType: "application/pdf",
+      sizeBytes: BigInt(receiptPdf.length),
+      checksumSha256: createHash("sha256").update(receiptPdf).digest("hex"),
+      isPublic: false,
+      status: "ready",
+    },
+  });
+
+  const maple = SEED_IDS.houseProperty;
+  const quay = SEED_IDS.flatProperty;
+  // Two calendar years (2025 + 2026), every expense category covered.
+  const expenses: Array<
+    [string, string, string, number, string, string | null]
+  > = [
+    // [id-suffix, propertyId, category, cents, date, description]
+    ["01", maple, "repairs", 18000, "2025-02-14", "PlumbCo — boiler repair"],
+    ["02", maple, "maintenance", 6500, "2025-04-03", "Gutter clearing"],
+    ["03", maple, "insurance", 32400, "2025-01-09", "Landlord insurance premium 2025"],
+    ["04", maple, "mortgage_interest", 41250, "2025-03-31", "Q1 2025 mortgage interest"],
+    ["05", maple, "certificates", 8500, "2025-05-20", "Gas safety certificate renewal"],
+    ["06", maple, "agent_fees", 11400, "2025-07-01", "Letting agent quarterly fee"],
+    ["07", maple, "utilities", 5600, "2025-08-12", "Void-period electricity"],
+    ["08", maple, "other", 4200, "2025-10-05", "Key cutting + lock change"],
+    ["09", quay, "repairs", 22000, "2025-06-18", "Washing machine replacement drum"],
+    ["10", quay, "insurance", 28900, "2025-01-15", "Landlord insurance premium 2025"],
+    ["11", quay, "mortgage_interest", 38700, "2025-06-30", "H1 2025 mortgage interest"],
+    ["12", quay, "agent_fees", 13200, "2025-09-30", "Letting agent quarterly fee"],
+    ["13", maple, "insurance", 33900, "2026-01-08", "Landlord insurance premium 2026"],
+    ["14", maple, "repairs", 18000, "2026-02-11", "PlumbCo — boiler repair (receipt)"],
+    ["15", maple, "maintenance", 7200, "2026-03-22", "Garden fence panel replacement"],
+    ["16", maple, "mortgage_interest", 40800, "2026-03-31", "Q1 2026 mortgage interest"],
+    ["17", maple, "certificates", 9200, "2026-05-28", "EICR electrical inspection"],
+    ["18", maple, "utilities", 4900, "2026-06-15", "Water rates adjustment"],
+    ["19", quay, "repairs", 9800, "2026-04-09", "Extractor fan replacement"],
+    ["20", quay, "maintenance", 15500, "2026-05-02", "Repaint hallway between tenancies"],
+    ["21", quay, "insurance", 30100, "2026-01-20", "Landlord insurance premium 2026"],
+    ["22", quay, "agent_fees", 13800, "2026-06-30", "Letting agent quarterly fee"],
+    ["23", quay, "other", 3500, "2026-07-01", "Replacement fobs for communal door"],
+    ["24", quay, "mortgage_interest", 37900, "2026-06-30", "H1 2026 mortgage interest"],
+  ];
+
+  for (const [suffix, propertyId, category, amountCents, date, description] of expenses) {
+    const id = `66666666-6666-4666-8666-6666666666${suffix}`;
+    await prisma.transaction.upsert({
+      where: { id },
+      update: {},
+      create: {
+        id,
+        propertyId,
+        direction: "expense",
+        category,
+        amountCents,
+        occurredOn: new Date(`${date}T00:00:00Z`),
+        description,
+        receiptFileId: suffix === "14" ? SEED_IDS.fileReceiptBoiler : null,
+      },
+    });
+  }
+  console.log(`Seeded ${expenses.length} expense transactions (2025–2026, all categories)`);
+}
+
 async function main() {
   const { adminId } = await seedUsers();
   await seedProperties();
   await seedTenantsAndTenancies();
   await seedContracts(adminId);
+  await seedExpenses(adminId);
   console.log("Seed complete.");
 }
 

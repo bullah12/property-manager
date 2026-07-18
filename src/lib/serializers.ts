@@ -4,6 +4,7 @@ import type {
   Property,
   Tenancy,
   Tenant,
+  Transaction,
   User,
   UserSettings,
 } from "@prisma/client";
@@ -125,6 +126,42 @@ export function serializeContract(
           },
         }
       : {}),
+  };
+}
+
+export function serializeTransaction(
+  t: Transaction & {
+    property?: Property;
+    tenancy?: (Tenancy & { tenant?: Tenant }) | null;
+    receiptFile?: File | null;
+  }
+) {
+  return {
+    id: t.id,
+    propertyId: t.propertyId,
+    tenancyId: t.tenancyId,
+    direction: t.direction,
+    category: t.category,
+    amountCents: t.amountCents,
+    currency: CURRENCY,
+    occurredOn: toDateOnly(t.occurredOn),
+    description: t.description,
+    receiptFileId: t.receiptFileId,
+    rentPeriod: t.rentPeriod ? toDateOnly(t.rentPeriod) : null,
+    createdAt: t.createdAt.toISOString(),
+    updatedAt: t.updatedAt.toISOString(),
+    ...(t.property ? { property: { id: t.property.id, nickname: t.property.nickname } } : {}),
+    ...(t.tenancy
+      ? {
+          tenancy: {
+            id: t.tenancy.id,
+            ...(t.tenancy.tenant
+              ? { tenant: { id: t.tenancy.tenant.id, fullName: t.tenancy.tenant.fullName } }
+              : {}),
+          },
+        }
+      : {}),
+    ...(t.receiptFile ? { receiptFile: serializeFile(t.receiptFile) } : {}),
   };
 }
 

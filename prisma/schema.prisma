@@ -14,20 +14,21 @@ datasource db {
 // ---- 0004_files_and_contracts ----
 
 model File {
-  id             String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ownerId        String?    @map("owner_id") @db.Uuid
+  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId        String?       @map("owner_id") @db.Uuid
   purpose        String
-  storageKey     String     @unique @map("storage_key")
-  contentType    String     @map("content_type")
-  sizeBytes      BigInt     @map("size_bytes")
-  checksumSha256 String?    @map("checksum_sha256")
-  isPublic       Boolean    @default(false) @map("is_public")
-  status         String     @default("pending")
-  variants       Json       @default("{}")
-  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  owner          User?      @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  storageKey     String        @unique @map("storage_key")
+  contentType    String        @map("content_type")
+  sizeBytes      BigInt        @map("size_bytes")
+  checksumSha256 String?       @map("checksum_sha256")
+  isPublic       Boolean       @default(false) @map("is_public")
+  status         String        @default("pending")
+  variants       Json          @default("{}")
+  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  owner          User?         @relation(fields: [ownerId], references: [id], onDelete: SetNull)
   contracts      Contract[]
+  transactions   Transaction[]
 
   @@index([ownerId], map: "idx_files_owner_id")
   @@map("files")
@@ -86,7 +87,8 @@ model Property {
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  tenancies Tenancy[]
+  tenancies    Tenancy[]
+  transactions Transaction[]
 
   @@index([status], map: "idx_properties_status")
   @@map("properties")
@@ -109,26 +111,52 @@ model Tenant {
 }
 
 model Tenancy {
-  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  propertyId         String   @map("property_id") @db.Uuid
-  tenantId           String   @map("tenant_id") @db.Uuid
-  startDate          DateTime @map("start_date") @db.Date
-  endDate            DateTime @map("end_date") @db.Date
-  rentAmountCents    Int      @map("rent_amount_cents")
-  rentDueDay         Int      @map("rent_due_day")
-  depositAmountCents Int?     @map("deposit_amount_cents")
-  depositScheme      String?  @map("deposit_scheme")
-  depositReference   String?  @map("deposit_reference")
-  status             String   @default("draft")
-  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  property           Property   @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  tenant             Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  id                 String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  propertyId         String        @map("property_id") @db.Uuid
+  tenantId           String        @map("tenant_id") @db.Uuid
+  startDate          DateTime      @map("start_date") @db.Date
+  endDate            DateTime      @map("end_date") @db.Date
+  rentAmountCents    Int           @map("rent_amount_cents")
+  rentDueDay         Int           @map("rent_due_day")
+  depositAmountCents Int?          @map("deposit_amount_cents")
+  depositScheme      String?       @map("deposit_scheme")
+  depositReference   String?       @map("deposit_reference")
+  status             String        @default("draft")
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  property           Property      @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  tenant             Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   contracts          Contract[]
+  transactions       Transaction[]
 
   @@index([propertyId, status], map: "idx_tenancies_property_id_status")
   @@index([tenantId], map: "idx_tenancies_tenant_id")
   @@map("tenancies")
+}
+
+// ---- 0005_transactions ----
+
+model Transaction {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  propertyId    String    @map("property_id") @db.Uuid
+  tenancyId     String?   @map("tenancy_id") @db.Uuid
+  direction     String
+  category      String
+  amountCents   Int       @map("amount_cents")
+  occurredOn    DateTime  @map("occurred_on") @db.Date
+  description   String?
+  receiptFileId String?   @map("receipt_file_id") @db.Uuid
+  rentPeriod    DateTime? @map("rent_period") @db.Date
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  property      Property  @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  tenancy       Tenancy?  @relation(fields: [tenancyId], references: [id], onDelete: SetNull)
+  receiptFile   File?     @relation(fields: [receiptFileId], references: [id], onDelete: SetNull)
+
+  @@index([propertyId, occurredOn(sort: Desc)], map: "idx_transactions_property_id_occurred_on")
+  @@index([tenancyId, rentPeriod], map: "idx_transactions_tenancy_id_rent_period")
+  @@index([receiptFileId], map: "idx_transactions_receipt_file_id")
+  @@map("transactions")
 }
 
 model UserSettings {

@@ -12,7 +12,7 @@ every phase.
 | 2 | Properties | ✅ green | ✅ see below | — |
 | 3 | Tenants & tenancies | ✅ green | ✅ see below | Renewal chain: predecessor → `renewed` when the successor (same property+tenant) is activated; different tenant still active → 409 (single-occupancy, §8 Q13) |
 | 4 | File uploads + contract upload | ✅ green | ✅ see below | — |
-| 5 | Expenses | — | — | — |
+| 5 | Expenses | ✅ green | ✅ see below | Transaction routes are the full §6 shape (direction-aware validation); the UI stays expense-only per the phase scope |
 | 6 | Monthly Income + Overview | — | — | — |
 | 7 | Compliance + reminders data | — | — | — |
 | 8 | Notification engine | — | — | — |
@@ -191,6 +191,33 @@ POST /tenancies/:quayDraft/activate      → 409 "No signed contract … or acti
 POST /tenancies/:temp/activate {override:true} → status=active ✓
 ```
 **PASS** (proof rows removed; canonical seed remains)
+
+### Phase 5 — Expenses
+
+Migration: `db/migrations/0005_transactions.sql` (verbatim, incl. the three
+CHECKs and indexes). Transactions GET/POST/PATCH/DELETE with the DB's
+direction/category and rent-row rules mirrored in Zod (PATCH re-validates the
+merged row); DELETE is a hard delete. Expenses tab: year+category filters,
+table with receipt links (signed URLs), inline add-expense form with receipt
+upload, Recharts category donut, Export CSV. `GET /api/v1/reports/expenses`
+CSV (with TOTAL row) + `format=json`. Property mini-stat `ytdExpensesCents`
+now live. Seed: 24 expenses across 2025–2026 covering all 8 categories, one
+with a stored receipt PDF. typecheck/lint/build green.
+
+Proof (2026-07-18, curl as admin):
+
+```
+POST /uploads (PNG receipt) + POST /transactions {expense, receiptFileId}
+  → 201, receipt attached ✓
+GET /transactions?propertyId&category=repairs&year=2026 → the 2 repairs rows ✓
+POST /transactions {direction:expense, category:rent}
+  → 400 VALIDATION_ERROR "direction 'expense' allows: repairs, …" ✓
+GET /reports/expenses?year=2026&format=csv
+  → text/csv attachment; rows + TOTAL,,,,2291.00 ✓ (receipt column yes/no)
+PATCH /transactions/:id {amountCents:4800} → 200 ✓ ; DELETE → {"deleted":true} ✓
+GET /properties/:maple → stats.ytdExpensesCents = 114000 (2026 sum) ✓
+```
+**PASS**
 
 ### Phase 0 — details
 

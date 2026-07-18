@@ -123,6 +123,35 @@ export interface ContractDto {
   };
 }
 
+export type ExpenseCategory =
+  | "repairs"
+  | "maintenance"
+  | "insurance"
+  | "mortgage_interest"
+  | "certificates"
+  | "agent_fees"
+  | "utilities"
+  | "other";
+
+export interface TransactionDto {
+  id: string;
+  propertyId: string;
+  tenancyId: string | null;
+  direction: "income" | "expense";
+  category: string;
+  amountCents: number;
+  currency: string;
+  occurredOn: string;
+  description: string | null;
+  receiptFileId: string | null;
+  rentPeriod: string | null;
+  createdAt: string;
+  updatedAt: string;
+  property?: { id: string; nickname: string };
+  tenancy?: { id: string; tenant?: { id: string; fullName: string } };
+  receiptFile?: FileDto;
+}
+
 export interface PropertyDetailDto extends PropertyDto {
   stats: {
     currentRentCents: number | null;

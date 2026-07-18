@@ -16,15 +16,20 @@ export const GET = apiHandler<{ id: string }>(async (_req, { params }) => {
   const property = await prisma.property.findUnique({ where: { id } });
   if (!property) throw notFound("Property");
 
-  // Header mini-stats (PLAN.md §4 wireframe 1). Remaining pieces land with
-  // their tables: next deadline (Phase 7), YTD expenses (Phase 5).
-  const activeTenancy = await prisma.tenancy.findFirst({
-    where: { propertyId: id, status: "active" },
-  });
+  // Header mini-stats (PLAN.md §4 wireframe 1). Next deadline lands with the
+  // compliance table (Phase 7).
+  const yearStart = new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1));
+  const [activeTenancy, ytd] = await Promise.all([
+    prisma.tenancy.findFirst({ where: { propertyId: id, status: "active" } }),
+    prisma.transaction.aggregate({
+      _sum: { amountCents: true },
+      where: { propertyId: id, direction: "expense", occurredOn: { gte: yearStart } },
+    }),
+  ]);
   const stats = {
     currentRentCents: activeTenancy?.rentAmountCents ?? null,
     nextDeadline: null as string | null,
-    ytdExpensesCents: 0,
+    ytdExpensesCents: ytd._sum.amountCents ?? 0,
   };
 
   return ok({ ...serializeProperty(property), stats });
