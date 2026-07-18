@@ -9,7 +9,7 @@ every phase.
 |---|---|---|---|---|
 | 0 | Scaffold + CI | ✅ green | ✅ see below | Local Supabase stack composed directly from upstream images (no Supabase CLI) — see Decisions D1 |
 | 1 | Auth + settings | ✅ green | ✅ see below | — |
-| 2 | Properties | — | — | — |
+| 2 | Properties | ✅ green | ✅ see below | — |
 | 3 | Tenants & tenancies | — | — | — |
 | 4 | File uploads + contract upload | — | — | — |
 | 5 | Expenses | — | — | — |
@@ -107,6 +107,32 @@ PATCH /api/v1/settings {rentOverdueGraceDays:-1}       → 400 VALIDATION_ERROR 
 GET  /settings unauthenticated                         → 307 → /login
 ```
 **PASS**
+
+### Phase 2 — Properties
+
+Migration: `db/migrations/0002_properties.sql` (verbatim from PLAN.md §3).
+Properties CRUD + archive/unarchive POST transitions; list screen (DataTable,
+server-side pagination/sort/filter, state held in the URL:
+`/properties?status=&propertyType=&sort=&page=`); create/edit form screens on
+routes; detail shell (header band + status badge + Edit/New-tenancy/Archive
+actions + 3 mini-stats + 5-tab strip with `?tab=` addressing, tabs are empty
+placeholders). Seed: Maple House + Quay Flat (active), Old Mill Cottage
+(archived). typecheck/lint/build green.
+
+Proof (2026-07-18, curl as admin):
+
+```
+POST /api/v1/properties {Proof Terrace…}    → 201 status=active
+GET  /api/v1/properties?status=active       → [Proof Terrace, Quay Flat, Maple House]
+POST /api/v1/properties/:id/archive         → status=archived
+GET  /api/v1/properties?status=active       → [Quay Flat, Maple House]      (filtered out)
+GET  /api/v1/properties?status=archived     → [Proof Terrace, Old Mill Cottage]
+POST /:id/archive again                     → 409 {"code":"CONFLICT",…}
+GET  /api/v1/properties?sort=nickname       → alphabetical order (sort honoured)
+GET  /properties?status=archived&sort=nickname (page, authed) → 200; the list
+     screen reads/writes exactly these URL params (filter/sort/page state).
+```
+**PASS** (test row removed afterwards to keep the seed dataset canonical)
 
 ### Phase 0 — details
 

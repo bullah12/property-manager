@@ -1,5 +1,13 @@
-import { PlaceholderPage } from "@/components/placeholder-page";
+import type { Metadata } from "next";
+import { Suspense } from "react";
+import { PropertiesList } from "./properties-list";
+
+export const metadata: Metadata = { title: "Properties" };
 
 export default function PropertiesPage() {
-  return <PlaceholderPage title="Properties" phase="Phase 2 (Properties)" />;
+  return (
+    <Suspense>
+      <PropertiesList />
+    </Suspense>
+  );
 }

@@ -27,6 +27,27 @@ model User {
   @@map("users")
 }
 
+// ---- 0002_properties ----
+
+model Property {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nickname           String
+  addressLine1       String   @map("address_line1")
+  addressLine2       String?  @map("address_line2")
+  city               String
+  postcode           String
+  propertyType       String   @map("property_type")
+  bedrooms           Int?
+  purchasePriceCents Int?     @map("purchase_price_cents")
+  notes              String?
+  status             String   @default("active")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status], map: "idx_properties_status")
+  @@map("properties")
+}
+
 model UserSettings {
   userId               String   @id @map("user_id") @db.Uuid
   defaultLeadDays      Int[]    @default([60, 30, 7]) @map("default_lead_days")

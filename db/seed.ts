@@ -94,8 +94,65 @@ async function seedUsers() {
   return { adminId };
 }
 
+// Fixed ids keep the seed idempotent and give the proof log stable handles.
+export const SEED_IDS = {
+  houseProperty: "11111111-1111-4111-8111-111111111101",
+  flatProperty: "11111111-1111-4111-8111-111111111102",
+  archivedProperty: "11111111-1111-4111-8111-111111111103",
+};
+
+async function seedProperties() {
+  const properties = [
+    {
+      id: SEED_IDS.houseProperty,
+      nickname: "Maple House",
+      addressLine1: "14 Maple Grove",
+      addressLine2: null,
+      city: "Leeds",
+      postcode: "LS6 2AB",
+      propertyType: "house",
+      bedrooms: 3,
+      purchasePriceCents: 24500000,
+      notes: "Semi-detached; boiler serviced annually.",
+      status: "active",
+    },
+    {
+      id: SEED_IDS.flatProperty,
+      nickname: "Quay Flat",
+      addressLine1: "Flat 12, Harbour Quay",
+      addressLine2: "3 Dockside Road",
+      city: "Bristol",
+      postcode: "BS1 4RT",
+      propertyType: "flat",
+      bedrooms: 2,
+      purchasePriceCents: 19800000,
+      notes: null,
+      status: "active",
+    },
+    {
+      id: SEED_IDS.archivedProperty,
+      nickname: "Old Mill Cottage",
+      addressLine1: "2 Mill Lane",
+      addressLine2: null,
+      city: "York",
+      postcode: "YO1 7HZ",
+      propertyType: "house",
+      bedrooms: 2,
+      purchasePriceCents: null,
+      notes: "Sold in 2024 — kept for records.",
+      status: "archived",
+    },
+  ];
+  for (const p of properties) {
+    const { id, ...data } = p;
+    await prisma.property.upsert({ where: { id }, update: data, create: { id, ...data } });
+  }
+  console.log(`Seeded ${properties.length} properties`);
+}
+
 async function main() {
   await seedUsers();
+  await seedProperties();
   console.log("Seed complete.");
 }
 
