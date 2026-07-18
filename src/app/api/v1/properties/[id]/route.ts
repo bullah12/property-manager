@@ -16,11 +16,13 @@ export const GET = apiHandler<{ id: string }>(async (_req, { params }) => {
   const property = await prisma.property.findUnique({ where: { id } });
   if (!property) throw notFound("Property");
 
-  // Header mini-stats (PLAN.md §4 wireframe 1). Populated by later phases as
-  // their tables land: current rent (Phase 3), next deadline (Phase 7),
-  // YTD expenses (Phase 5).
+  // Header mini-stats (PLAN.md §4 wireframe 1). Remaining pieces land with
+  // their tables: next deadline (Phase 7), YTD expenses (Phase 5).
+  const activeTenancy = await prisma.tenancy.findFirst({
+    where: { propertyId: id, status: "active" },
+  });
   const stats = {
-    currentRentCents: null as number | null,
+    currentRentCents: activeTenancy?.rentAmountCents ?? null,
     nextDeadline: null as string | null,
     ytdExpensesCents: 0,
   };

@@ -99,6 +99,15 @@ export const SEED_IDS = {
   houseProperty: "11111111-1111-4111-8111-111111111101",
   flatProperty: "11111111-1111-4111-8111-111111111102",
   archivedProperty: "11111111-1111-4111-8111-111111111103",
+  tenantTom: "22222222-2222-4222-8222-222222222201",
+  tenantPriya: "22222222-2222-4222-8222-222222222202",
+  tenantMarcus: "22222222-2222-4222-8222-222222222203",
+  tenantElena: "22222222-2222-4222-8222-222222222204",
+  tenancyMapleRenewed: "33333333-3333-4333-8333-333333333301",
+  tenancyMapleActive: "33333333-3333-4333-8333-333333333302",
+  tenancyQuayEnded: "33333333-3333-4333-8333-333333333303",
+  tenancyQuayDraft: "33333333-3333-4333-8333-333333333304",
+  tenancyMillEnded: "33333333-3333-4333-8333-333333333305",
 };
 
 async function seedProperties() {
@@ -150,9 +159,124 @@ async function seedProperties() {
   console.log(`Seeded ${properties.length} properties`);
 }
 
+async function seedTenantsAndTenancies() {
+  const tenants = [
+    {
+      id: SEED_IDS.tenantTom,
+      fullName: "Tom Field",
+      email: "tom.field@example.com",
+      phone: "+44 7700 900101",
+      notes: null,
+    },
+    {
+      id: SEED_IDS.tenantPriya,
+      fullName: "Priya Shah",
+      email: "priya.shah@example.com",
+      phone: "+44 7700 900102",
+      notes: "Prefers email contact.",
+    },
+    {
+      id: SEED_IDS.tenantMarcus,
+      fullName: "Marcus Webb",
+      email: "marcus.webb@example.com",
+      phone: null,
+      notes: "Rented two properties over the years.",
+    },
+    {
+      id: SEED_IDS.tenantElena,
+      fullName: "Elena Novak",
+      email: null,
+      phone: "+44 7700 900104",
+      notes: "Prospective tenant — viewing booked.",
+    },
+  ];
+  for (const t of tenants) {
+    const { id, ...data } = t;
+    await prisma.tenant.upsert({ where: { id }, update: data, create: { id, ...data } });
+  }
+
+  // Tenancies covering all four states (PLAN.md §3 seed spec):
+  // - Maple House: renewed → active chain for Tom Field.
+  // - Quay Flat: ended (Marcus) then a draft (Priya) starting soon.
+  // - Old Mill Cottage: ended (Marcus again — same tenant, two properties).
+  const tenancies = [
+    {
+      id: SEED_IDS.tenancyMapleRenewed,
+      propertyId: SEED_IDS.houseProperty,
+      tenantId: SEED_IDS.tenantTom,
+      startDate: new Date("2023-09-01T00:00:00Z"),
+      endDate: new Date("2024-08-31T00:00:00Z"),
+      rentAmountCents: 90000,
+      rentDueDay: 1,
+      depositAmountCents: 103800,
+      depositScheme: "DPS (custodial)",
+      depositReference: "DPS-10293847",
+      status: "renewed",
+    },
+    {
+      id: SEED_IDS.tenancyMapleActive,
+      propertyId: SEED_IDS.houseProperty,
+      tenantId: SEED_IDS.tenantTom,
+      startDate: new Date("2024-09-01T00:00:00Z"),
+      endDate: new Date("2026-08-31T00:00:00Z"),
+      rentAmountCents: 95000,
+      rentDueDay: 1,
+      depositAmountCents: 109500,
+      depositScheme: "DPS (custodial)",
+      depositReference: "DPS-10293847",
+      status: "active",
+    },
+    {
+      id: SEED_IDS.tenancyQuayEnded,
+      propertyId: SEED_IDS.flatProperty,
+      tenantId: SEED_IDS.tenantMarcus,
+      startDate: new Date("2024-02-01T00:00:00Z"),
+      endDate: new Date("2026-01-31T00:00:00Z"),
+      rentAmountCents: 115000,
+      rentDueDay: 15,
+      depositAmountCents: 132600,
+      depositScheme: "TDS (insured)",
+      depositReference: "TDS-55201",
+      status: "ended",
+    },
+    {
+      id: SEED_IDS.tenancyQuayDraft,
+      propertyId: SEED_IDS.flatProperty,
+      tenantId: SEED_IDS.tenantPriya,
+      startDate: new Date("2026-08-01T00:00:00Z"),
+      endDate: new Date("2027-07-31T00:00:00Z"),
+      rentAmountCents: 125000,
+      rentDueDay: 5,
+      depositAmountCents: 144200,
+      depositScheme: "mydeposits (custodial)",
+      depositReference: "MYD-88104",
+      status: "draft",
+    },
+    {
+      id: SEED_IDS.tenancyMillEnded,
+      propertyId: SEED_IDS.archivedProperty,
+      tenantId: SEED_IDS.tenantMarcus,
+      startDate: new Date("2022-03-01T00:00:00Z"),
+      endDate: new Date("2023-02-28T00:00:00Z"),
+      rentAmountCents: 75000,
+      rentDueDay: 1,
+      depositAmountCents: null,
+      depositScheme: null,
+      depositReference: null,
+      status: "ended",
+    },
+  ];
+  for (const t of tenancies) {
+    const { id, ...data } = t;
+    await prisma.tenancy.upsert({ where: { id }, update: data, create: { id, ...data } });
+  }
+  console.log(`Seeded ${tenants.length} tenants, ${tenancies.length} tenancies`);
+}
+
 async function main() {
   await seedUsers();
   await seedProperties();
+  await seedTenantsAndTenancies();
   console.log("Seed complete.");
 }
 

@@ -10,7 +10,7 @@ every phase.
 | 0 | Scaffold + CI | ✅ green | ✅ see below | Local Supabase stack composed directly from upstream images (no Supabase CLI) — see Decisions D1 |
 | 1 | Auth + settings | ✅ green | ✅ see below | — |
 | 2 | Properties | ✅ green | ✅ see below | — |
-| 3 | Tenants & tenancies | — | — | — |
+| 3 | Tenants & tenancies | ✅ green | ✅ see below | Renewal chain: predecessor → `renewed` when the successor (same property+tenant) is activated; different tenant still active → 409 (single-occupancy, §8 Q13) |
 | 4 | File uploads + contract upload | — | — | — |
 | 5 | Expenses | — | — | — |
 | 6 | Monthly Income + Overview | — | — | — |
@@ -133,6 +133,33 @@ GET  /properties?status=archived&sort=nickname (page, authed) → 200; the list
      screen reads/writes exactly these URL params (filter/sort/page state).
 ```
 **PASS** (test row removed afterwards to keep the seed dataset canonical)
+
+### Phase 3 — Tenants & Tenancies
+
+Migration: `db/migrations/0003_tenants_tenancies.sql` (verbatim). Tenants
+CRUD + list (search, sort, URL state) + detail with cross-property tenancy
+history; tenancies create-as-draft, PATCH-while-draft-only, POST
+activate/end/renew transitions; New-tenancy form (pick property,
+pick-or-create tenant, dates, rent+due day, deposit, clause toggles from
+settings — clauses feed contract generation in Phase 9); Tenancy tab (current
+tenancy card with Activate/End/Renew + past tenancies). Seed: 4 tenants, 5
+tenancies in all four states incl. Maple House renewed→active chain and
+Marcus Webb across two properties. typecheck/lint/build green.
+
+Proof (2026-07-18, curl as admin):
+
+```
+POST /tenancies {Elena on Old Mill Cottage}   → 201 status=draft
+PATCH while draft {rent 82000}                → 200 (edit allowed)
+POST /:id/activate                            → status=active
+PATCH while active                            → 409 CONFLICT "Only a draft tenancy can be edited"
+POST /:id/renew                               → 201 successor draft 2027-08-01→2028-07-31 (pre-filled)
+POST /successor/activate                      → successor active; predecessor status=renewed ✓
+POST /successor/end                           → status=ended
+GET /tenants/:marcus                          → tenancies: [(Quay Flat, ended), (Old Mill Cottage, ended)]
+                                                — one tenant across two properties ✓
+```
+**PASS** (walk-through rows removed afterwards; canonical seed remains)
 
 ### Phase 0 — details
 

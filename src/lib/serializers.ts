@@ -1,4 +1,5 @@
-import type { Property, User, UserSettings } from "@prisma/client";
+import type { Property, Tenancy, Tenant, User, UserSettings } from "@prisma/client";
+import { toDateOnly } from "@/lib/dates";
 
 export const CURRENCY = "gbp";
 
@@ -33,6 +34,45 @@ export function serializeProperty(p: Property) {
     status: p.status,
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
+  };
+}
+
+export function serializeTenant(t: Tenant) {
+  return {
+    id: t.id,
+    fullName: t.fullName,
+    email: t.email,
+    phone: t.phone,
+    notes: t.notes,
+    createdAt: t.createdAt.toISOString(),
+    updatedAt: t.updatedAt.toISOString(),
+  };
+}
+
+export function serializeTenancy(
+  t: Tenancy & { tenant?: Tenant; property?: Property }
+) {
+  return {
+    id: t.id,
+    propertyId: t.propertyId,
+    tenantId: t.tenantId,
+    startDate: toDateOnly(t.startDate),
+    endDate: toDateOnly(t.endDate),
+    rentAmountCents: t.rentAmountCents,
+    rentDueDay: t.rentDueDay,
+    depositAmountCents: t.depositAmountCents,
+    depositScheme: t.depositScheme,
+    depositReference: t.depositReference,
+    currency: CURRENCY,
+    status: t.status,
+    createdAt: t.createdAt.toISOString(),
+    updatedAt: t.updatedAt.toISOString(),
+    ...(t.tenant
+      ? { tenant: { id: t.tenant.id, fullName: t.tenant.fullName, email: t.tenant.email, phone: t.tenant.phone } }
+      : {}),
+    ...(t.property
+      ? { property: { id: t.property.id, nickname: t.property.nickname, status: t.property.status } }
+      : {}),
   };
 }
 

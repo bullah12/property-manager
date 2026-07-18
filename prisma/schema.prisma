@@ -44,8 +44,48 @@ model Property {
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
+  tenancies Tenancy[]
+
   @@index([status], map: "idx_properties_status")
   @@map("properties")
+}
+
+// ---- 0003_tenants_tenancies ----
+
+model Tenant {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fullName  String    @map("full_name")
+  email     String?   @db.Citext
+  phone     String?
+  notes     String?
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenancies Tenancy[]
+
+  @@index([email], map: "idx_tenants_email")
+  @@map("tenants")
+}
+
+model Tenancy {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  propertyId         String   @map("property_id") @db.Uuid
+  tenantId           String   @map("tenant_id") @db.Uuid
+  startDate          DateTime @map("start_date") @db.Date
+  endDate            DateTime @map("end_date") @db.Date
+  rentAmountCents    Int      @map("rent_amount_cents")
+  rentDueDay         Int      @map("rent_due_day")
+  depositAmountCents Int?     @map("deposit_amount_cents")
+  depositScheme      String?  @map("deposit_scheme")
+  depositReference   String?  @map("deposit_reference")
+  status             String   @default("draft")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  property           Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+
+  @@index([propertyId, status], map: "idx_tenancies_property_id_status")
+  @@index([tenantId], map: "idx_tenancies_tenant_id")
+  @@map("tenancies")
 }
 
 model UserSettings {

@@ -49,6 +49,46 @@ export interface PropertyDto {
   updatedAt: string;
 }
 
+export interface TenantDto {
+  id: string;
+  fullName: string;
+  email: string | null;
+  phone: string | null;
+  notes: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface TenantListItemDto extends TenantDto {
+  tenancyCount: number;
+  currentProperties: string[];
+}
+
+export type TenancyStatus = "draft" | "active" | "ended" | "renewed";
+
+export interface TenancyDto {
+  id: string;
+  propertyId: string;
+  tenantId: string;
+  startDate: string;
+  endDate: string;
+  rentAmountCents: number;
+  rentDueDay: number;
+  depositAmountCents: number | null;
+  depositScheme: string | null;
+  depositReference: string | null;
+  currency: string;
+  status: TenancyStatus;
+  createdAt: string;
+  updatedAt: string;
+  tenant?: { id: string; fullName: string; email: string | null; phone: string | null };
+  property?: { id: string; nickname: string; status: string };
+}
+
+export interface TenantDetailDto extends TenantDto {
+  tenancies: TenancyDto[];
+}
+
 export interface PropertyDetailDto extends PropertyDto {
   stats: {
     currentRentCents: number | null;
