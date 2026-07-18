@@ -1,5 +1,8 @@
-import { PlaceholderPage } from "@/components/placeholder-page";
+import type { Metadata } from "next";
+import { OverviewScreen } from "./overview-screen";
+
+export const metadata: Metadata = { title: "Overview" };
 
 export default function OverviewPage() {
-  return <PlaceholderPage title="Overview" phase="Phase 6 (Monthly Income + Overview)" />;
+  return <OverviewScreen />;
 }

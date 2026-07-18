@@ -13,7 +13,7 @@ every phase.
 | 3 | Tenants & tenancies | ✅ green | ✅ see below | Renewal chain: predecessor → `renewed` when the successor (same property+tenant) is activated; different tenant still active → 409 (single-occupancy, §8 Q13) |
 | 4 | File uploads + contract upload | ✅ green | ✅ see below | — |
 | 5 | Expenses | ✅ green | ✅ see below | Transaction routes are the full §6 shape (direction-aware validation); the UI stays expense-only per the phase scope |
-| 6 | Monthly Income + Overview | — | — | — |
+| 6 | Monthly Income + Overview | ✅ green | ✅ see below | Overview's "deadlines ≤30d" card reads 0 until the compliance table lands in Phase 7 (by design) |
 | 7 | Compliance + reminders data | — | — | — |
 | 8 | Notification engine | — | — | — |
 | 9 | Auto contract generation | — | — | — |
@@ -216,6 +216,37 @@ GET /reports/expenses?year=2026&format=csv
   → text/csv attachment; rows + TOTAL,,,,2291.00 ✓ (receipt column yes/no)
 PATCH /transactions/:id {amountCents:4800} → 200 ✓ ; DELETE → {"deleted":true} ✓
 GET /properties/:maple → stats.ytdExpensesCents = 114000 (2026 sum) ✓
+```
+**PASS**
+
+### Phase 6 — Monthly Income + Overview
+
+No migration. §5.1 implemented verbatim in `src/lib/income.ts`
+(`deriveRentPeriods`, `monthStatus` with grace window, compute-on-read grid,
+`findOverdueRentPeriods` limited to current+previous period for active
+tenancies — reused by the Phase 8 scan). `GET /properties/:id/income?year=`
+(dev-only `?today=` test clock); Monthly Income tab per §4 wireframe 2: 12-
+month grid with the five cell states, record-payment popover (POST rent
+transaction with `rentPeriod`), corrections on paid cells, per-month and
+per-year totals, expected-vs-received bar chart. `GET /stats/overview` +
+Overview screen (4 stat cards + overdue list + recent activity). Seed: rent
+rows making May 2026 partial, June 2026 overdue, July 2026 paid.
+typecheck/lint/build green.
+
+Proof (2026-07-18, curl as admin, grace=3):
+
+```
+GET /properties/:maple/income?year=2026 →
+  Tom Field (active): Jan–Apr paid · May PARTIAL (45000/95000) ·
+  Jun OVERDUE (0 received, 47d late) · Jul PAID · Aug upcoming
+POST /transactions {category:rent, rentPeriod:2026-06-01, 95000}
+  → June cell flips to paid ✓ (then deleted → reverts; correction flow ✓)
+POST rent without rentPeriod → 400 "rent rows require a rentPeriod" ✓
+GET /stats/overview →
+  monthRent 95000/95000 · overdueRent count=1 [Tom Field 2026-06, 47d late]
+  (May partial is outside the current+previous-period §5.1 scope — by design)
+  ytdExpensesCents=224600 · recentActivity 10 items
+?today= test clock ignored in production build ✓ (honoured in dev)
 ```
 **PASS**
 

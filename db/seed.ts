@@ -493,12 +493,99 @@ async function seedExpenses(adminId: string) {
   console.log(`Seeded ${expenses.length} expense transactions (2025–2026, all categories)`);
 }
 
+async function seedRentPayments() {
+  // Rent rows making the 2026 Maple House grid read (against a mid-July 2026
+  // "today"): Jan–Apr paid, May PARTIAL (£450 of £950), Jun OVERDUE (nothing
+  // received), Jul PAID. 2025 fully paid for chart depth. Quay Flat's ended
+  // tenancy gets its last few months so past-year grids have data.
+  const rows: Array<{
+    id: string;
+    propertyId: string;
+    tenancyId: string;
+    amountCents: number;
+    occurredOn: string;
+    rentPeriod: string;
+    description?: string;
+  }> = [];
+
+  const maple = { propertyId: SEED_IDS.houseProperty, tenancyId: SEED_IDS.tenancyMapleActive };
+  for (let m = 1; m <= 12; m++) {
+    const mm = String(m).padStart(2, "0");
+    rows.push({
+      id: `77777777-7777-4777-8777-2025${mm}000001`,
+      ...maple,
+      amountCents: 95000,
+      occurredOn: `2025-${mm}-01`,
+      rentPeriod: `2025-${mm}-01`,
+    });
+  }
+  for (const mm of ["01", "02", "03", "04"]) {
+    rows.push({
+      id: `77777777-7777-4777-8777-2026${mm}000001`,
+      ...maple,
+      amountCents: 95000,
+      occurredOn: `2026-${mm}-01`,
+      rentPeriod: `2026-${mm}-01`,
+    });
+  }
+  rows.push({
+    id: "77777777-7777-4777-8777-202605000001",
+    ...maple,
+    amountCents: 45000,
+    occurredOn: "2026-05-03",
+    rentPeriod: "2026-05-01",
+    description: "Part payment — tenant covering rest next week",
+  });
+  // June 2026: intentionally no payment → OVERDUE.
+  rows.push({
+    id: "77777777-7777-4777-8777-202607000001",
+    ...maple,
+    amountCents: 95000,
+    occurredOn: "2026-07-01",
+    rentPeriod: "2026-07-01",
+  });
+
+  const quay = { propertyId: SEED_IDS.flatProperty, tenancyId: SEED_IDS.tenancyQuayEnded };
+  for (const [mm, yyyy] of [
+    ["10", "2025"],
+    ["11", "2025"],
+    ["12", "2025"],
+    ["01", "2026"],
+  ] as const) {
+    rows.push({
+      id: `77777777-7777-4777-8777-${yyyy}${mm}000002`,
+      ...quay,
+      amountCents: 115000,
+      occurredOn: `${yyyy}-${mm}-15`,
+      rentPeriod: `${yyyy}-${mm}-01`,
+    });
+  }
+
+  for (const r of rows) {
+    const { id, occurredOn, rentPeriod, ...data } = r;
+    await prisma.transaction.upsert({
+      where: { id },
+      update: {},
+      create: {
+        id,
+        ...data,
+        direction: "income",
+        category: "rent",
+        occurredOn: new Date(`${occurredOn}T00:00:00Z`),
+        rentPeriod: new Date(`${rentPeriod}T00:00:00Z`),
+      },
+    });
+  }
+  console.log(`Seeded ${rows.length} rent payments (paid/partial/overdue months)`);
+}
+
 async function main() {
   const { adminId } = await seedUsers();
   await seedProperties();
   await seedTenantsAndTenancies();
   await seedContracts(adminId);
   await seedExpenses(adminId);
+  await seedRentPayments();
   console.log("Seed complete.");
 }
 
