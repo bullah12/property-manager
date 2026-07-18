@@ -1,0 +1,266 @@
+// Prisma mirrors the SQL migrations in db/migrations/ (the contract).
+// After adding a migration, run `npm run db:migrate`, then keep these models
+// in sync by hand (annotations like @updatedAt live only here).
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ---- 0004_files_and_contracts ----
+
+model File {
+  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId            String?             @map("owner_id") @db.Uuid
+  purpose            String
+  storageKey         String              @unique @map("storage_key")
+  contentType        String              @map("content_type")
+  sizeBytes          BigInt              @map("size_bytes")
+  checksumSha256     String?             @map("checksum_sha256")
+  isPublic           Boolean             @default(false) @map("is_public")
+  status             String              @default("pending")
+  variants           Json                @default("{}")
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  owner              User?               @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  contracts          Contract[]
+  transactions       Transaction[]
+  complianceItems    ComplianceItem[]
+  generatedDocuments GeneratedDocument[]
+
+  @@index([ownerId], map: "idx_files_owner_id")
+  @@map("files")
+}
+
+model Contract {
+  id                  String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenancyId           String             @map("tenancy_id") @db.Uuid
+  kind                String
+  source              String
+  fileId              String             @map("file_id") @db.Uuid
+  generatedDocumentId String?            @map("generated_document_id") @db.Uuid
+  signedOn            DateTime?          @map("signed_on") @db.Date
+  status              String             @default("draft")
+  createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenancy             Tenancy            @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
+  file                File               @relation(fields: [fileId], references: [id], onDelete: Restrict)
+  generatedDocument   GeneratedDocument? @relation(fields: [generatedDocumentId], references: [id], onDelete: SetNull, map: "fk_contracts_generated_document_id")
+
+  @@index([tenancyId], map: "idx_contracts_tenancy_id")
+  @@index([fileId], map: "idx_contracts_file_id")
+  @@map("contracts")
+}
+
+// ---- 0001_users_and_settings ----
+
+model User {
+  id            String         @id @db.Uuid
+  email         String         @unique @db.Citext
+  displayName   String         @map("display_name")
+  role          String         @default("admin")
+  status        String         @default("active")
+  timezone      String         @default("Europe/London")
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  settings      UserSettings?
+  files         File[]
+  notifications Notification[]
+
+  @@map("users")
+}
+
+// ---- 0002_properties ----
+
+model Property {
+  id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  nickname           String
+  addressLine1       String   @map("address_line1")
+  addressLine2       String?  @map("address_line2")
+  city               String
+  postcode           String
+  propertyType       String   @map("property_type")
+  bedrooms           Int?
+  purchasePriceCents Int?     @map("purchase_price_cents")
+  notes              String?
+  status             String   @default("active")
+  createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  tenancies       Tenancy[]
+  transactions    Transaction[]
+  complianceItems ComplianceItem[]
+
+  @@index([status], map: "idx_properties_status")
+  @@map("properties")
+}
+
+// ---- 0003_tenants_tenancies ----
+
+model Tenant {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  fullName  String    @map("full_name")
+  email     String?   @db.Citext
+  phone     String?
+  notes     String?
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenancies Tenancy[]
+
+  @@index([email], map: "idx_tenants_email")
+  @@map("tenants")
+}
+
+model Tenancy {
+  id                 String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  propertyId         String        @map("property_id") @db.Uuid
+  tenantId           String        @map("tenant_id") @db.Uuid
+  startDate          DateTime      @map("start_date") @db.Date
+  endDate            DateTime      @map("end_date") @db.Date
+  rentAmountCents    Int           @map("rent_amount_cents")
+  rentDueDay         Int           @map("rent_due_day")
+  depositAmountCents Int?          @map("deposit_amount_cents")
+  depositScheme      String?       @map("deposit_scheme")
+  depositReference   String?       @map("deposit_reference")
+  status             String        @default("draft")
+  createdAt          DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  property           Property      @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  tenant             Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  contracts          Contract[]
+  transactions       Transaction[]
+
+  @@index([propertyId, status], map: "idx_tenancies_property_id_status")
+  @@index([tenantId], map: "idx_tenancies_tenant_id")
+  @@map("tenancies")
+}
+
+// ---- 0005_transactions ----
+
+model Transaction {
+  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  propertyId    String    @map("property_id") @db.Uuid
+  tenancyId     String?   @map("tenancy_id") @db.Uuid
+  direction     String
+  category      String
+  amountCents   Int       @map("amount_cents")
+  occurredOn    DateTime  @map("occurred_on") @db.Date
+  description   String?
+  receiptFileId String?   @map("receipt_file_id") @db.Uuid
+  rentPeriod    DateTime? @map("rent_period") @db.Date
+  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  property      Property  @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  tenancy       Tenancy?  @relation(fields: [tenancyId], references: [id], onDelete: SetNull)
+  receiptFile   File?     @relation(fields: [receiptFileId], references: [id], onDelete: SetNull)
+
+  @@index([propertyId, occurredOn(sort: Desc)], map: "idx_transactions_property_id_occurred_on")
+  @@index([tenancyId, rentPeriod], map: "idx_transactions_tenancy_id_rent_period")
+  @@index([receiptFileId], map: "idx_transactions_receipt_file_id")
+  @@map("transactions")
+}
+
+// ---- 0006_compliance_and_reminders ----
+
+model ComplianceItem {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  propertyId       String    @map("property_id") @db.Uuid
+  kind             String
+  label            String
+  dueOn            DateTime  @map("due_on") @db.Date
+  completedOn      DateTime? @map("completed_on") @db.Date
+  documentFileId   String?   @map("document_file_id") @db.Uuid
+  recurrenceMonths Int?      @map("recurrence_months")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  property         Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  documentFile     File?     @relation(fields: [documentFileId], references: [id], onDelete: SetNull)
+
+  @@index([propertyId], map: "idx_compliance_items_property_id")
+  @@map("compliance_items")
+}
+
+model Reminder {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subjectType      String   @map("subject_type")
+  subjectId        String   @map("subject_id") @db.Uuid
+  dueOn            DateTime @map("due_on") @db.Date
+  leadDays         Int[]    @default([60, 30, 7]) @map("lead_days")
+  lastNotifiedLead Int?     @map("last_notified_lead")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([subjectType, subjectId])
+  @@index([dueOn], map: "idx_reminders_due_on")
+  @@map("reminders")
+}
+
+// ---- 0007_notifications_and_jobs ----
+
+model Notification {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  type      String
+  title     String
+  body      String?
+  linkPath  String?   @map("link_path")
+  dedupeKey String?   @map("dedupe_key")
+  readAt    DateTime? @map("read_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model Job {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type        String
+  payload     Json     @default("{}")
+  status      String   @default("pending")
+  runAt       DateTime @default(now()) @map("run_at") @db.Timestamptz(6)
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(3) @map("max_attempts")
+  lastError   String?  @map("last_error")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status, runAt], map: "idx_jobs_status_run_at")
+  @@map("jobs")
+}
+
+// ---- 0008_generated_documents ----
+
+model GeneratedDocument {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  docType         String     @map("doc_type")
+  templateVersion String     @map("template_version")
+  subjectType     String     @map("subject_type")
+  subjectId       String     @map("subject_id") @db.Uuid
+  fileId          String     @map("file_id") @db.Uuid
+  inputSnapshot   Json       @map("input_snapshot")
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  file            File       @relation(fields: [fileId], references: [id], onDelete: Restrict)
+  contracts       Contract[]
+
+  @@index([subjectType, subjectId], map: "idx_generated_documents_subject")
+  @@index([fileId], map: "idx_generated_documents_file_id")
+  @@map("generated_documents")
+}
+
+model UserSettings {
+  userId               String   @id @map("user_id") @db.Uuid
+  defaultLeadDays      Int[]    @default([60, 30, 7]) @map("default_lead_days")
+  rentOverdueGraceDays Int      @default(3) @map("rent_overdue_grace_days")
+  emailEnabled         Boolean  @default(true) @map("email_enabled")
+  clausePetsDefault    Boolean  @default(false) @map("clause_pets_default")
+  clauseGardenDefault  Boolean  @default(false) @map("clause_garden_default")
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("user_settings")
+}
