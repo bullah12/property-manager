@@ -2,6 +2,8 @@ import type {
   ComplianceItem,
   Contract,
   File,
+  Job,
+  Notification,
   Property,
   Reminder,
   Tenancy,
@@ -195,6 +197,32 @@ export function serializeReminder(r: Reminder) {
     leadDays: r.leadDays,
     lastNotifiedLead: r.lastNotifiedLead,
     updatedAt: r.updatedAt.toISOString(),
+  };
+}
+
+export function serializeNotification(n: Notification) {
+  return {
+    id: n.id,
+    type: n.type,
+    title: n.title,
+    body: n.body,
+    linkPath: n.linkPath,
+    readAt: n.readAt ? n.readAt.toISOString() : null,
+    createdAt: n.createdAt.toISOString(),
+  };
+}
+
+export function serializeJob(j: Job) {
+  return {
+    id: j.id,
+    type: j.type,
+    status: j.status,
+    runAt: j.runAt.toISOString(),
+    attempts: j.attempts,
+    maxAttempts: j.maxAttempts,
+    lastError: j.lastError,
+    createdAt: j.createdAt.toISOString(),
+    updatedAt: j.updatedAt.toISOString(),
   };
 }
 

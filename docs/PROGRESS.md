@@ -15,7 +15,7 @@ every phase.
 | 5 | Expenses | ✅ green | ✅ see below | Transaction routes are the full §6 shape (direction-aware validation); the UI stays expense-only per the phase scope |
 | 6 | Monthly Income + Overview | ✅ green | ✅ see below | Overview's "deadlines ≤30d" card reads 0 until the compliance table lands in Phase 7 (by design) |
 | 7 | Compliance + reminders data | ✅ green | ✅ see below | Overview "deadlines ≤30d" counts reminder rows (compliance **and** lease-expiry), since reminders are the deadline-as-data table |
-| 8 | Notification engine | — | — | — |
+| 8 | Notification engine | ✅ green | ✅ see below | Email templates are typed HTML render functions behind `sendEmail()` (mock mode logs payloads — no Resend key in this environment); `GET /api/v1/reminders` added to power the inbox's "All upcoming deadlines" section (§4); `ALLOW_TEST_CLOCK=1` lets a production build honour `?today=` for local proofs |
 | 9 | Auto contract generation | — | — | — |
 
 ## Decisions
@@ -286,6 +286,49 @@ PATCH /reminders/:id {leadDays:[45,14,3]} → override applied ✓
 GET /stats/overview → deadlinesDueSoon=1 (EICR) ; property nextDeadline=2026-08-05 ✓
 ```
 **PASS** (seed re-run afterwards to restore the canonical dataset)
+
+### Phase 8 — Notification Engine
+
+Migration: `db/migrations/0007_notifications_and_jobs.sql` (verbatim, incl.
+the `dedupe_key` partial unique index — §8 Q10). `notify()` uses
+`INSERT … ON CONFLICT (dedupe_key) DO NOTHING RETURNING id`; email-worthy
+types (cert.expiring / lease.expiring / rent.overdue /
+contract.generation_failed) enqueue `email.send` jobs — never sent inline.
+Jobs runner: claim via `FOR UPDATE SKIP LOCKED`, retries with exponential
+backoff to `max_attempts`, then `dead`; `email.send` is idempotent via a
+`sentAt` payload marker; `files.orphan_sweep` deletes >24h-pending files.
+Cron routes guarded by `CRON_SECRET`: `POST /api/internal/cron/daily-scan`
+(§5.2 lead ladder — one lead per scan, `last_notified_lead` +
+dedupe-key guarded — plus the §5.1 rent-overdue pass and the orphan-sweep
+enqueue; `?today=` test clock outside production or with ALLOW_TEST_CLOCK=1)
+and `POST /api/internal/cron/run-jobs`. `sendEmail()` wrapper: Resend when
+`RESEND_API_KEY` is set, dev mock mode (logs payload) otherwise. Notifications
+inbox screen (unread feed + mark-read/read-all + all-upcoming-deadlines
+section) and live sidebar unread badge (30s poll). Dead-letter card with
+retry on Settings. Seed: 1 read + 1 unread notification, 1 dead job.
+typecheck/lint/build green.
+
+Proof (2026-07-18; production build with ALLOW_TEST_CLOCK=1):
+
+```
+POST /api/internal/cron/daily-scan (wrong secret)      → 401 UNAUTHENTICATED ✓
+scan ?today=2026-06-10 → {leadNotifications:2 (gas+EICR 60-lead),
+                          rentOverdueNotifications:2 (May partial + June), jobsRan:5}
+scan ?today=2026-07-10 → EICR daysUntil=26 crosses the 30-day lead:
+  exactly ONE new cert.expiring for the EICR
+  (dedupe_key cert.expiring:<reminderId>:30); June rent DEDUPED (count 1) ✓
+scan ?today=2026-07-10 again → EICR: nothing new ✓ (gas ladder continues to 7)
+fourth identical run       → {leadNotifications:0, rentOverdue:0} — fully quiet ✓
+rent.overdue rows: one per tenancy+period
+  (…:2026-05-01, …:2026-06-01), duplicates impossible via unique index ✓
+email.send jobs all succeeded, mode=mock, payload.sentAt set;
+  server log shows "[email:mock] to=admin@example.com subject=…" ✓
+Inbox API: unread count 8 → mark-read → read-all {markedRead:7} ✓
+Dead job visible (GET /jobs?status=dead → 1) → POST retry → pending →
+  runner processed it (mock email sent) ✓
+GET /api/v1/reminders → 5 deadlines across properties sorted by due date ✓
+```
+**PASS** (notifications/jobs reset + reseeded to the canonical dataset after)
 
 ### Phase 0 — details
 

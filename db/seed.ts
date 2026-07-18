@@ -711,6 +711,56 @@ async function seedComplianceAndReminders(adminId: string) {
   console.log(`Seeded ${items.length} compliance items + ${reminderTargets.length} reminders`);
 }
 
+async function seedNotificationsAndJobs(adminId: string) {
+  // A handful of notifications (read + unread) so the inbox has content
+  // before the first scan, and one dead job for dead-letter visibility.
+  const notifications = [
+    {
+      id: "99999999-9999-4999-8999-999999999901",
+      type: "cert.expiring",
+      title: "Gas certificate due in 30 days at Maple House",
+      body: "Gas certificate for Maple House is due on 2026-06-20.",
+      linkPath: `/properties/${SEED_IDS.houseProperty}?tab=notifications`,
+      dedupeKey: "cert.expiring:seed:30",
+      readAt: new Date("2026-05-22T09:15:00Z"),
+      createdAt: new Date("2026-05-21T08:00:00Z"),
+    },
+    {
+      id: "99999999-9999-4999-8999-999999999902",
+      type: "lease.expiring",
+      title: "Tenancy ends in 60 days at Maple House",
+      body: "Tom Field's tenancy at Maple House ends on 2026-08-31. Renew or plan the changeover.",
+      linkPath: `/properties/${SEED_IDS.houseProperty}?tab=tenancy`,
+      dedupeKey: "lease.expiring:seed:60",
+      readAt: null,
+      createdAt: new Date("2026-07-02T08:00:00Z"),
+    },
+  ];
+  for (const n of notifications) {
+    const { id, ...data } = n;
+    await prisma.notification.upsert({
+      where: { id },
+      update: {},
+      create: { id, userId: adminId, ...data },
+    });
+  }
+
+  await prisma.job.upsert({
+    where: { id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa01" },
+    update: {},
+    create: {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa01",
+      type: "email.send",
+      payload: { notificationId: "99999999-9999-4999-8999-999999999901" },
+      status: "dead",
+      attempts: 3,
+      maxAttempts: 3,
+      lastError: "Seeded example: SMTP connection refused (dead-letter demo)",
+    },
+  });
+  console.log("Seeded 2 notifications (1 read, 1 unread) + 1 dead job");
+}
+
 async function main() {
   const { adminId } = await seedUsers();
   await seedProperties();
@@ -719,6 +769,7 @@ async function main() {
   await seedExpenses(adminId);
   await seedRentPayments();
   await seedComplianceAndReminders(adminId);
+  await seedNotificationsAndJobs(adminId);
   console.log("Seed complete.");
 }
 

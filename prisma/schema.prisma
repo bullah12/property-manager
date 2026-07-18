@@ -57,16 +57,17 @@ model Contract {
 // ---- 0001_users_and_settings ----
 
 model User {
-  id          String        @id @db.Uuid
-  email       String        @unique @db.Citext
-  displayName String        @map("display_name")
-  role        String        @default("admin")
-  status      String        @default("active")
-  timezone    String        @default("Europe/London")
-  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  settings    UserSettings?
-  files       File[]
+  id            String         @id @db.Uuid
+  email         String         @unique @db.Citext
+  displayName   String         @map("display_name")
+  role          String         @default("admin")
+  status        String         @default("active")
+  timezone      String         @default("Europe/London")
+  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  settings      UserSettings?
+  files         File[]
+  notifications Notification[]
 
   @@map("users")
 }
@@ -194,6 +195,39 @@ model Reminder {
   @@unique([subjectType, subjectId])
   @@index([dueOn], map: "idx_reminders_due_on")
   @@map("reminders")
+}
+
+// ---- 0007_notifications_and_jobs ----
+
+model Notification {
+  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  userId    String    @map("user_id") @db.Uuid
+  type      String
+  title     String
+  body      String?
+  linkPath  String?   @map("link_path")
+  dedupeKey String?   @map("dedupe_key")
+  readAt    DateTime? @map("read_at") @db.Timestamptz(6)
+  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("notifications")
+}
+
+model Job {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  type        String
+  payload     Json     @default("{}")
+  status      String   @default("pending")
+  runAt       DateTime @default(now()) @map("run_at") @db.Timestamptz(6)
+  attempts    Int      @default(0)
+  maxAttempts Int      @default(3) @map("max_attempts")
+  lastError   String?  @map("last_error")
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@index([status, runAt], map: "idx_jobs_status_run_at")
+  @@map("jobs")
 }
 
 model UserSettings {

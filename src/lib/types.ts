@@ -188,6 +188,37 @@ export interface ComplianceItemDto {
   reminder?: ReminderDto | null;
 }
 
+export interface NotificationDto {
+  id: string;
+  type: string;
+  title: string;
+  body: string | null;
+  linkPath: string | null;
+  readAt: string | null;
+  createdAt: string;
+}
+
+export interface JobDto {
+  id: string;
+  type: string;
+  status: "pending" | "running" | "succeeded" | "failed" | "dead";
+  runAt: string;
+  attempts: number;
+  maxAttempts: number;
+  lastError: string | null;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface UpcomingDeadlineDto extends ReminderDto {
+  subject: {
+    label: string;
+    propertyId: string;
+    propertyNickname: string;
+    linkPath: string;
+  };
+}
+
 export interface PropertyDetailDto extends PropertyDto {
   stats: {
     currentRentCents: number | null;

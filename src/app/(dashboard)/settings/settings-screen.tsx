@@ -2,6 +2,7 @@
 
 import { Skeleton } from "@/components/ui/skeleton";
 import { useMe } from "@/hooks/use-me";
+import { JobsHealthCard } from "./jobs-health";
 import { SettingsForm } from "./settings-form";
 
 export function SettingsScreen() {
@@ -25,5 +26,10 @@ export function SettingsScreen() {
       </div>
     );
   }
-  return <SettingsForm me={me} />;
+  return (
+    <div className="space-y-6">
+      <SettingsForm me={me} />
+      <JobsHealthCard />
+    </div>
+  );
 }

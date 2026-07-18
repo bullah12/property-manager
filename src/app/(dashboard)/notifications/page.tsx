@@ -1,5 +1,8 @@
-import { PlaceholderPage } from "@/components/placeholder-page";
+import type { Metadata } from "next";
+import { NotificationsScreen } from "./notifications-screen";
+
+export const metadata: Metadata = { title: "Notifications" };
 
 export default function NotificationsPage() {
-  return <PlaceholderPage title="Notifications" phase="Phase 8 (Notification Engine)" />;
+  return <NotificationsScreen />;
 }

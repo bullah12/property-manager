@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useUnreadCount } from "@/hooks/use-notifications";
 import { navItems } from "@/lib/nav";
 import { cn } from "@/lib/utils";
 
@@ -35,7 +36,12 @@ export function SidebarNav({ onNavigate }: { onNavigate?: () => void }) {
   );
 }
 
-/** Unread-notifications badge; wired to real data in Phase 8. */
 function UnreadBadge() {
-  return null;
+  const { data: count } = useUnreadCount();
+  if (!count) return null;
+  return (
+    <span className="inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 py-0.5 text-[10px] font-semibold text-primary-foreground">
+      {count > 99 ? "99+" : count}
+    </span>
+  );
 }
