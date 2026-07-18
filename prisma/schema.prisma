@@ -14,21 +14,22 @@ datasource db {
 // ---- 0004_files_and_contracts ----
 
 model File {
-  id             String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ownerId        String?       @map("owner_id") @db.Uuid
-  purpose        String
-  storageKey     String        @unique @map("storage_key")
-  contentType    String        @map("content_type")
-  sizeBytes      BigInt        @map("size_bytes")
-  checksumSha256 String?       @map("checksum_sha256")
-  isPublic       Boolean       @default(false) @map("is_public")
-  status         String        @default("pending")
-  variants       Json          @default("{}")
-  createdAt      DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt      DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  owner          User?         @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  contracts      Contract[]
-  transactions   Transaction[]
+  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId         String?          @map("owner_id") @db.Uuid
+  purpose         String
+  storageKey      String           @unique @map("storage_key")
+  contentType     String           @map("content_type")
+  sizeBytes       BigInt           @map("size_bytes")
+  checksumSha256  String?          @map("checksum_sha256")
+  isPublic        Boolean          @default(false) @map("is_public")
+  status          String           @default("pending")
+  variants        Json             @default("{}")
+  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  owner           User?            @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  contracts       Contract[]
+  transactions    Transaction[]
+  complianceItems ComplianceItem[]
 
   @@index([ownerId], map: "idx_files_owner_id")
   @@map("files")
@@ -87,8 +88,9 @@ model Property {
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  tenancies    Tenancy[]
-  transactions Transaction[]
+  tenancies       Tenancy[]
+  transactions    Transaction[]
+  complianceItems ComplianceItem[]
 
   @@index([status], map: "idx_properties_status")
   @@map("properties")
@@ -157,6 +159,41 @@ model Transaction {
   @@index([tenancyId, rentPeriod], map: "idx_transactions_tenancy_id_rent_period")
   @@index([receiptFileId], map: "idx_transactions_receipt_file_id")
   @@map("transactions")
+}
+
+// ---- 0006_compliance_and_reminders ----
+
+model ComplianceItem {
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  propertyId       String    @map("property_id") @db.Uuid
+  kind             String
+  label            String
+  dueOn            DateTime  @map("due_on") @db.Date
+  completedOn      DateTime? @map("completed_on") @db.Date
+  documentFileId   String?   @map("document_file_id") @db.Uuid
+  recurrenceMonths Int?      @map("recurrence_months")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  property         Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
+  documentFile     File?     @relation(fields: [documentFileId], references: [id], onDelete: SetNull)
+
+  @@index([propertyId], map: "idx_compliance_items_property_id")
+  @@map("compliance_items")
+}
+
+model Reminder {
+  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  subjectType      String   @map("subject_type")
+  subjectId        String   @map("subject_id") @db.Uuid
+  dueOn            DateTime @map("due_on") @db.Date
+  leadDays         Int[]    @default([60, 30, 7]) @map("lead_days")
+  lastNotifiedLead Int?     @map("last_notified_lead")
+  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  @@unique([subjectType, subjectId])
+  @@index([dueOn], map: "idx_reminders_due_on")
+  @@map("reminders")
 }
 
 model UserSettings {

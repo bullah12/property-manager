@@ -93,7 +93,11 @@ export function PropertyForm({ property }: { property?: PropertyDto }) {
       queryClient.invalidateQueries({ queryKey: ["properties"] });
       queryClient.invalidateQueries({ queryKey: ["property", data.id] });
       toast.success(isEdit ? "Property updated" : "Property created");
-      router.push(`/properties/${data.id}`);
+      // Flow 1 (PLAN.md §4): after create, prompt to add UK-default
+      // compliance items on the Notifications tab.
+      router.push(
+        isEdit ? `/properties/${data.id}` : `/properties/${data.id}?tab=notifications&setup=1`
+      );
     },
     onError: (err) => {
       toast.error(err instanceof ApiClientError ? err.message : "Failed to save");

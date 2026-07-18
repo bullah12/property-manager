@@ -6,6 +6,7 @@ import { parse, parseBody } from "@/lib/api/validate";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { parseDateOnly, toDateOnly } from "@/lib/dates";
+import { syncTenancyReminder } from "@/lib/reminders";
 import { patchTenancySchema } from "@/lib/schemas/tenancy";
 import { serializeTenancy } from "@/lib/serializers";
 import { getTenancyOr404 } from "@/lib/tenancies";
@@ -35,10 +36,14 @@ export const PATCH = apiHandler<{ id: string }>(async (req, { params }) => {
     throw conflict("endDate must be after startDate");
   }
 
-  const tenancy = await prisma.tenancy.update({
-    where: { id },
-    data: { ...body, startDate, endDate },
-    include: { tenant: true, property: true },
+  const tenancy = await prisma.$transaction(async (tx) => {
+    const updated = await tx.tenancy.update({
+      where: { id },
+      data: { ...body, startDate, endDate },
+      include: { tenant: true, property: true },
+    });
+    await syncTenancyReminder(tx, updated);
+    return updated;
   });
   return ok(serializeTenancy(tenancy));
 });

@@ -7,6 +7,7 @@ import { paginationQuery, parseBody, parseQuery } from "@/lib/api/validate";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { parseDateOnly } from "@/lib/dates";
+import { syncTenancyReminder } from "@/lib/reminders";
 import { createTenancySchema } from "@/lib/schemas/tenancy";
 import { serializeTenancy } from "@/lib/serializers";
 
@@ -37,7 +38,7 @@ export const GET = apiHandler(async (req) => {
   return okList(rows.map(serializeTenancy), listMeta(q.page, q.perPage, total));
 });
 
-/** Create as 'draft' (PLAN.md §6). Reminder arming arrives in Phase 7. */
+/** Create as 'draft' (PLAN.md §6); arms the lease-expiry reminder (§5.2). */
 export const POST = apiHandler(async (req) => {
   await requireAdmin();
   const body = await parseBody(req, createTenancySchema);
@@ -49,14 +50,19 @@ export const POST = apiHandler(async (req) => {
   if (!property) throw notFound("Property");
   if (!tenant) throw notFound("Tenant");
 
-  const tenancy = await prisma.tenancy.create({
-    data: {
-      ...body,
-      startDate: parseDateOnly(body.startDate),
-      endDate: parseDateOnly(body.endDate),
-      status: "draft",
-    },
-    include: { tenant: true, property: true },
+  const tenancy = await prisma.$transaction(async (tx) => {
+    const created = await tx.tenancy.create({
+      data: {
+        ...body,
+        startDate: parseDateOnly(body.startDate),
+        endDate: parseDateOnly(body.endDate),
+        status: "draft",
+      },
+      include: { tenant: true, property: true },
+    });
+    // §5.2: draft/active tenancies carry a lease-expiry reminder.
+    await syncTenancyReminder(tx, created);
+    return created;
   });
   return ok(serializeTenancy(tenancy), 201);
 });

@@ -14,7 +14,7 @@ every phase.
 | 4 | File uploads + contract upload | ✅ green | ✅ see below | — |
 | 5 | Expenses | ✅ green | ✅ see below | Transaction routes are the full §6 shape (direction-aware validation); the UI stays expense-only per the phase scope |
 | 6 | Monthly Income + Overview | ✅ green | ✅ see below | Overview's "deadlines ≤30d" card reads 0 until the compliance table lands in Phase 7 (by design) |
-| 7 | Compliance + reminders data | — | — | — |
+| 7 | Compliance + reminders data | ✅ green | ✅ see below | Overview "deadlines ≤30d" counts reminder rows (compliance **and** lease-expiry), since reminders are the deadline-as-data table |
 | 8 | Notification engine | — | — | — |
 | 9 | Auto contract generation | — | — | — |
 
@@ -249,6 +249,43 @@ GET /stats/overview →
 ?today= test clock ignored in production build ✓ (honoured in dev)
 ```
 **PASS**
+
+### Phase 7 — Compliance Items + Reminders Data
+
+Migration: `db/migrations/0006_compliance_and_reminders.sql` (verbatim, incl.
+`UNIQUE(subject_type, subject_id)`). Compliance CRUD +
+`POST /compliance-items/:id/complete` with the §5.2/§8-Q7 rollover (new due =
+completed_on + recurrence, **same row**, reminder ladder reset; one-off items
+keep completed_on and lose their reminder). Reminder upsert hooks in the same
+transaction on compliance writes AND all tenancy writes (create, PATCH
+end-date change resets the ladder, activate keeps armed, end/renew-supersede
+deletes) — lease-expiry reminders armed and backfilled for seed tenancies.
+`GET /properties/:id/compliance` includes per-item reminder + next-fire
+preview; `PATCH /reminders/:id` lead-day override. Property Notifications
+tab: status chips (ok / due soon ≤30d / overdue / completed), mark-complete
+dialog with certificate upload, edit with lead-day override, add with kind
+presets. Flow 1: property create → "Add compliance items?" dialog pre-filled
+with UK defaults (gas 12 / EICR 60 / EPC 120). `nextDeadline` mini-stat and
+Overview deadlines card now live. Seed: overdue gas cert (+stored 2025 scan),
+EICR due ≤30d, future EPC, completed smoke/CO check, 5 reminders.
+typecheck/lint/build green.
+
+Proof (2026-07-18, curl as admin):
+
+```
+GET /properties/:maple/compliance →
+  gas_certificate due 2026-06-20 (overdue; all leads past → nextFire null)
+  electrical_eicr due 2026-08-05 → nextFire {lead:7, fireOn:2026-07-29} ✓
+POST /compliance-items/:gas/complete {completedOn:2026-07-18}
+  → dueOn 2026-06-20 → **2027-07-18** (completed_on + 12mo, same row,
+    completedOn back to null); reminder row: due_on=2027-07-18,
+    last_notified_lead=NULL ✓
+POST /tenancies (draft, end 2027-08-31) → reminder row (tenancy, 2027-08-31) ✓
+PATCH endDate → 2027-12-31 → reminder follows, ladder reset ✓
+PATCH /reminders/:id {leadDays:[45,14,3]} → override applied ✓
+GET /stats/overview → deadlinesDueSoon=1 (EICR) ; property nextDeadline=2026-08-05 ✓
+```
+**PASS** (seed re-run afterwards to restore the canonical dataset)
 
 ### Phase 0 — details
 

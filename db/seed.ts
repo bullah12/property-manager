@@ -118,6 +118,11 @@ export const SEED_IDS = {
   contractQuayDraft: "55555555-5555-4555-8555-555555555503",
   contractQuayIssued: "55555555-5555-4555-8555-555555555504",
   fileReceiptBoiler: "44444444-4444-4444-8444-444444444405",
+  fileGasCert: "44444444-4444-4444-8444-444444444406",
+  complianceGasOverdue: "88888888-8888-4888-8888-888888888801",
+  complianceEicrSoon: "88888888-8888-4888-8888-888888888802",
+  complianceEpcFuture: "88888888-8888-4888-8888-888888888803",
+  complianceSmokeDone: "88888888-8888-4888-8888-888888888804",
 };
 
 async function seedProperties() {
@@ -579,6 +584,133 @@ async function seedRentPayments() {
   console.log(`Seeded ${rows.length} rent payments (paid/partial/overdue months)`);
 }
 
+async function seedComplianceAndReminders(adminId: string) {
+  // Attach last year's gas certificate scan to the overdue item.
+  const certPdf = makePdf("Gas Safety Record - Maple House - 2025");
+  const certKey = `certificate/${SEED_IDS.fileGasCert}/maple-gas-cert-2025.pdf`;
+  const { error } = await supabaseAdmin.storage
+    .from(STORAGE_BUCKET)
+    .upload(certKey, certPdf, { contentType: "application/pdf", upsert: true });
+  if (error) throw new Error(`cert upload failed: ${error.message}`);
+  await prisma.file.upsert({
+    where: { id: SEED_IDS.fileGasCert },
+    update: { status: "ready" },
+    create: {
+      id: SEED_IDS.fileGasCert,
+      ownerId: adminId,
+      purpose: "certificate",
+      storageKey: certKey,
+      contentType: "application/pdf",
+      sizeBytes: BigInt(certPdf.length),
+      checksumSha256: createHash("sha256").update(certPdf).digest("hex"),
+      isPublic: false,
+      status: "ready",
+    },
+  });
+
+  // PLAN.md §3 seed spec: one overdue, one due ≤30d, one comfortably future,
+  // one completed (dates relative to a mid-July 2026 "today").
+  const items = [
+    {
+      id: SEED_IDS.complianceGasOverdue,
+      propertyId: SEED_IDS.houseProperty,
+      kind: "gas_certificate",
+      label: "Gas certificate",
+      dueOn: "2026-06-20", // overdue
+      completedOn: null as string | null,
+      documentFileId: SEED_IDS.fileGasCert,
+      recurrenceMonths: 12,
+    },
+    {
+      id: SEED_IDS.complianceEicrSoon,
+      propertyId: SEED_IDS.houseProperty,
+      kind: "electrical_eicr",
+      label: "Electrical EICR",
+      dueOn: "2026-08-05", // due within 30 days
+      completedOn: null,
+      documentFileId: null,
+      recurrenceMonths: 60,
+    },
+    {
+      id: SEED_IDS.complianceEpcFuture,
+      propertyId: SEED_IDS.flatProperty,
+      kind: "epc",
+      label: "EPC",
+      dueOn: "2028-09-30", // comfortably future
+      completedOn: null,
+      documentFileId: null,
+      recurrenceMonths: 120,
+    },
+    {
+      id: SEED_IDS.complianceSmokeDone,
+      propertyId: SEED_IDS.flatProperty,
+      kind: "smoke_co_check",
+      label: "Smoke & CO alarm check",
+      dueOn: "2026-05-01",
+      completedOn: "2026-05-01", // completed one-off
+      documentFileId: null,
+      recurrenceMonths: null,
+    },
+  ];
+  for (const item of items) {
+    const { id, dueOn, completedOn, ...data } = item;
+    await prisma.complianceItem.upsert({
+      where: { id },
+      update: {
+        dueOn: new Date(`${dueOn}T00:00:00Z`),
+        completedOn: completedOn ? new Date(`${completedOn}T00:00:00Z`) : null,
+      },
+      create: {
+        id,
+        ...data,
+        dueOn: new Date(`${dueOn}T00:00:00Z`),
+        completedOn: completedOn ? new Date(`${completedOn}T00:00:00Z`) : null,
+      },
+    });
+  }
+
+  // Matching reminders (§5.2): open compliance items + draft/active tenancies
+  // (lease-expiry backfill for the seed tenancies).
+  const reminderTargets: Array<["compliance_item" | "tenancy", string, string]> = [
+    ["compliance_item", SEED_IDS.complianceGasOverdue, "2026-06-20"],
+    ["compliance_item", SEED_IDS.complianceEicrSoon, "2026-08-05"],
+    ["compliance_item", SEED_IDS.complianceEpcFuture, "2028-09-30"],
+    ["tenancy", SEED_IDS.tenancyMapleActive, "2026-08-31"],
+    ["tenancy", SEED_IDS.tenancyQuayDraft, "2027-07-31"],
+  ];
+  for (const [subjectType, subjectId, dueOn] of reminderTargets) {
+    await prisma.reminder.upsert({
+      where: { subjectType_subjectId: { subjectType, subjectId } },
+      update: { dueOn: new Date(`${dueOn}T00:00:00Z`) },
+      create: {
+        subjectType,
+        subjectId,
+        dueOn: new Date(`${dueOn}T00:00:00Z`),
+        leadDays: [60, 30, 7],
+      },
+    });
+  }
+  // Completed/ended subjects must not have reminder rows.
+  await prisma.reminder.deleteMany({
+    where: {
+      OR: [
+        { subjectType: "compliance_item", subjectId: SEED_IDS.complianceSmokeDone },
+        {
+          subjectType: "tenancy",
+          subjectId: {
+            in: [
+              SEED_IDS.tenancyMapleRenewed,
+              SEED_IDS.tenancyQuayEnded,
+              SEED_IDS.tenancyMillEnded,
+            ],
+          },
+        },
+      ],
+    },
+  });
+  console.log(`Seeded ${items.length} compliance items + ${reminderTargets.length} reminders`);
+}
+
 async function main() {
   const { adminId } = await seedUsers();
   await seedProperties();
@@ -586,6 +718,7 @@ async function main() {
   await seedContracts(adminId);
   await seedExpenses(adminId);
   await seedRentPayments();
+  await seedComplianceAndReminders(adminId);
   console.log("Seed complete.");
 }
 

@@ -152,6 +152,42 @@ export interface TransactionDto {
   receiptFile?: FileDto;
 }
 
+export type ComplianceKind =
+  | "gas_certificate"
+  | "electrical_eicr"
+  | "epc"
+  | "smoke_co_check"
+  | "inspection"
+  | "insurance"
+  | "custom";
+
+export interface ReminderDto {
+  id: string;
+  subjectType: "compliance_item" | "tenancy";
+  subjectId: string;
+  dueOn: string;
+  leadDays: number[];
+  lastNotifiedLead: number | null;
+  updatedAt: string;
+  nextFire?: { lead: number; fireOn: string } | null;
+}
+
+export interface ComplianceItemDto {
+  id: string;
+  propertyId: string;
+  kind: ComplianceKind;
+  label: string;
+  dueOn: string;
+  completedOn: string | null;
+  documentFileId: string | null;
+  recurrenceMonths: number | null;
+  createdAt: string;
+  updatedAt: string;
+  property?: { id: string; nickname: string };
+  documentFile?: FileDto;
+  reminder?: ReminderDto | null;
+}
+
 export interface PropertyDetailDto extends PropertyDto {
   stats: {
     currentRentCents: number | null;

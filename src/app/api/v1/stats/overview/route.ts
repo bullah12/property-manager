@@ -52,8 +52,13 @@ export const GET = apiHandler(async () => {
     },
   });
 
-  // Deadlines due ≤30 days — wired to compliance_items in Phase 7.
-  const deadlinesDueSoon = 0;
+  // Deadlines due ≤30 days: reminder rows (compliance + lease expiry) —
+  // overdue ones count too, they are still open deadlines.
+  const soonCutoff = parseDateOnly(today);
+  soonCutoff.setUTCDate(soonCutoff.getUTCDate() + 30);
+  const deadlinesDueSoon = await prisma.reminder.count({
+    where: { dueOn: { lte: soonCutoff } },
+  });
 
   const recent = await prisma.transaction.findMany({
     orderBy: [{ createdAt: "desc" }],

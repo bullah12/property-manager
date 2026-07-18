@@ -1,7 +1,9 @@
 import type {
+  ComplianceItem,
   Contract,
   File,
   Property,
+  Reminder,
   Tenancy,
   Tenant,
   Transaction,
@@ -162,6 +164,37 @@ export function serializeTransaction(
         }
       : {}),
     ...(t.receiptFile ? { receiptFile: serializeFile(t.receiptFile) } : {}),
+  };
+}
+
+export function serializeComplianceItem(
+  c: ComplianceItem & { property?: Property; documentFile?: File | null }
+) {
+  return {
+    id: c.id,
+    propertyId: c.propertyId,
+    kind: c.kind,
+    label: c.label,
+    dueOn: toDateOnly(c.dueOn),
+    completedOn: c.completedOn ? toDateOnly(c.completedOn) : null,
+    documentFileId: c.documentFileId,
+    recurrenceMonths: c.recurrenceMonths,
+    createdAt: c.createdAt.toISOString(),
+    updatedAt: c.updatedAt.toISOString(),
+    ...(c.property ? { property: { id: c.property.id, nickname: c.property.nickname } } : {}),
+    ...(c.documentFile ? { documentFile: serializeFile(c.documentFile) } : {}),
+  };
+}
+
+export function serializeReminder(r: Reminder) {
+  return {
+    id: r.id,
+    subjectType: r.subjectType,
+    subjectId: r.subjectId,
+    dueOn: toDateOnly(r.dueOn),
+    leadDays: r.leadDays,
+    lastNotifiedLead: r.lastNotifiedLead,
+    updatedAt: r.updatedAt.toISOString(),
   };
 }
 

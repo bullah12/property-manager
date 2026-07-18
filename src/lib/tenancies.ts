@@ -1,6 +1,7 @@
 import { conflict, notFound } from "@/lib/api/errors";
 import { prisma } from "@/lib/db";
 import { addDays, addMonths, diffDays, parseDateOnly, toDateOnly } from "@/lib/dates";
+import { deleteReminder, syncTenancyReminder } from "@/lib/reminders";
 
 export async function getTenancyOr404(id: string) {
   const tenancy = await prisma.tenancy.findUnique({
@@ -46,12 +47,15 @@ export async function activateTenancy(
         where: { id: conflicting.id },
         data: { status: "renewed" },
       });
+      await deleteReminder(tx, "tenancy", conflicting.id);
     }
-    return tx.tenancy.update({
+    const updated = await tx.tenancy.update({
       where: { id },
       data: { status: "active" },
       include: { tenant: true, property: true },
     });
+    await syncTenancyReminder(tx, updated);
+    return updated;
   });
 }
 
@@ -61,10 +65,14 @@ export async function endTenancy(id: string) {
   if (tenancy.status !== "active") {
     throw conflict(`Only an active tenancy can be ended (status: ${tenancy.status})`);
   }
-  return prisma.tenancy.update({
-    where: { id },
-    data: { status: "ended" },
-    include: { tenant: true, property: true },
+  return prisma.$transaction(async (tx) => {
+    const updated = await tx.tenancy.update({
+      where: { id },
+      data: { status: "ended" },
+      include: { tenant: true, property: true },
+    });
+    await deleteReminder(tx, "tenancy", id);
+    return updated;
   });
 }
 
@@ -104,7 +112,8 @@ export async function renewTenancy(id: string, overrides: RenewOverrides) {
     throw conflict("Renewal endDate must be after startDate");
   }
 
-  return prisma.tenancy.create({
+  return prisma.$transaction(async (tx) => {
+    const successor = await tx.tenancy.create({
     data: {
       propertyId: predecessor.propertyId,
       tenantId: predecessor.tenantId,
@@ -127,5 +136,8 @@ export async function renewTenancy(id: string, overrides: RenewOverrides) {
       status: "draft",
     },
     include: { tenant: true, property: true },
+    });
+    await syncTenancyReminder(tx, successor);
+    return successor;
   });
 }
