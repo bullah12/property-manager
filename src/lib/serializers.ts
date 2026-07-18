@@ -1,4 +1,12 @@
-import type { Property, Tenancy, Tenant, User, UserSettings } from "@prisma/client";
+import type {
+  Contract,
+  File,
+  Property,
+  Tenancy,
+  Tenant,
+  User,
+  UserSettings,
+} from "@prisma/client";
 import { toDateOnly } from "@/lib/dates";
 
 export const CURRENCY = "gbp";
@@ -72,6 +80,50 @@ export function serializeTenancy(
       : {}),
     ...(t.property
       ? { property: { id: t.property.id, nickname: t.property.nickname, status: t.property.status } }
+      : {}),
+  };
+}
+
+export function serializeFile(f: File) {
+  return {
+    id: f.id,
+    purpose: f.purpose,
+    filename: f.storageKey.split("/").pop() ?? f.storageKey,
+    contentType: f.contentType,
+    sizeBytes: Number(f.sizeBytes),
+    checksumSha256: f.checksumSha256,
+    status: f.status,
+    createdAt: f.createdAt.toISOString(),
+  };
+}
+
+export function serializeContract(
+  c: Contract & { file?: File; tenancy?: Tenancy & { tenant?: Tenant } }
+) {
+  return {
+    id: c.id,
+    tenancyId: c.tenancyId,
+    kind: c.kind,
+    source: c.source,
+    fileId: c.fileId,
+    generatedDocumentId: c.generatedDocumentId,
+    signedOn: c.signedOn ? toDateOnly(c.signedOn) : null,
+    status: c.status,
+    createdAt: c.createdAt.toISOString(),
+    updatedAt: c.updatedAt.toISOString(),
+    ...(c.file ? { file: serializeFile(c.file) } : {}),
+    ...(c.tenancy
+      ? {
+          tenancy: {
+            id: c.tenancy.id,
+            startDate: toDateOnly(c.tenancy.startDate),
+            endDate: toDateOnly(c.tenancy.endDate),
+            status: c.tenancy.status,
+            ...(c.tenancy.tenant
+              ? { tenant: { id: c.tenancy.tenant.id, fullName: c.tenancy.tenant.fullName } }
+              : {}),
+          },
+        }
       : {}),
   };
 }

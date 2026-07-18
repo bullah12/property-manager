@@ -5,6 +5,7 @@
  * Phase 1: admin user (+settings) able to log in, plus a suspended user to
  * exercise the requireAuth status check.
  */
+import { createHash } from "node:crypto";
 import { PrismaClient } from "@prisma/client";
 import { createClient } from "@supabase/supabase-js";
 import "dotenv/config";
@@ -108,6 +109,14 @@ export const SEED_IDS = {
   tenancyQuayEnded: "33333333-3333-4333-8333-333333333303",
   tenancyQuayDraft: "33333333-3333-4333-8333-333333333304",
   tenancyMillEnded: "33333333-3333-4333-8333-333333333305",
+  fileMapleSigned: "44444444-4444-4444-8444-444444444401",
+  fileMapleOld: "44444444-4444-4444-8444-444444444402",
+  fileQuayDraft: "44444444-4444-4444-8444-444444444403",
+  fileQuayEnded: "44444444-4444-4444-8444-444444444404",
+  contractMapleSigned: "55555555-5555-4555-8555-555555555501",
+  contractMapleSuperseded: "55555555-5555-4555-8555-555555555502",
+  contractQuayDraft: "55555555-5555-4555-8555-555555555503",
+  contractQuayIssued: "55555555-5555-4555-8555-555555555504",
 };
 
 async function seedProperties() {
@@ -273,10 +282,144 @@ async function seedTenantsAndTenancies() {
   console.log(`Seeded ${tenants.length} tenants, ${tenancies.length} tenancies`);
 }
 
+/** Tiny but valid single-page PDF, so downloads open in a viewer. */
+function makePdf(title: string): Buffer {
+  const text = title.replace(/[()\\]/g, "");
+  const content = `BT /F1 18 Tf 72 760 Td (${text}) Tj ET`;
+  const objs = [
+    "<< /Type /Catalog /Pages 2 0 R >>",
+    "<< /Type /Pages /Kids [3 0 R] /Count 1 >>",
+    "<< /Type /Page /Parent 2 0 R /MediaBox [0 0 595 842] /Resources << /Font << /F1 5 0 R >> >> /Contents 4 0 R >>",
+    `<< /Length ${content.length} >>\nstream\n${content}\nendstream`,
+    "<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>",
+  ];
+  let body = "%PDF-1.4\n";
+  const offsets: number[] = [];
+  objs.forEach((o, i) => {
+    offsets.push(body.length);
+    body += `${i + 1} 0 obj\n${o}\nendobj\n`;
+  });
+  const xrefStart = body.length;
+  body += `xref\n0 ${objs.length + 1}\n0000000000 65535 f \n`;
+  for (const off of offsets) body += `${String(off).padStart(10, "0")} 00000 n \n`;
+  body += `trailer\n<< /Size ${objs.length + 1} /Root 1 0 R >>\nstartxref\n${xrefStart}\n%%EOF\n`;
+  return Buffer.from(body, "latin1");
+}
+
+const STORAGE_BUCKET = "files";
+
+async function ensureBucket() {
+  const { data: buckets, error } = await supabaseAdmin.storage.listBuckets();
+  if (error) throw new Error(`listBuckets failed: ${error.message}`);
+  if (!buckets.some((b) => b.name === STORAGE_BUCKET)) {
+    const { error: e } = await supabaseAdmin.storage.createBucket(STORAGE_BUCKET, {
+      public: false,
+    });
+    if (e) throw new Error(`createBucket failed: ${e.message}`);
+  }
+}
+
+async function seedFileAndContract(opts: {
+  fileId: string;
+  contractId: string;
+  tenancyId: string;
+  ownerId: string;
+  kind: string;
+  status: "draft" | "issued" | "signed" | "superseded";
+  signedOn?: string;
+  title: string;
+  name: string;
+}) {
+  const pdf = makePdf(opts.title);
+  const storageKey = `lease-doc/${opts.fileId}/${opts.name}`;
+  const { error } = await supabaseAdmin.storage
+    .from(STORAGE_BUCKET)
+    .upload(storageKey, pdf, { contentType: "application/pdf", upsert: true });
+  if (error) throw new Error(`seed upload failed: ${error.message}`);
+
+  const checksum = createHash("sha256").update(pdf).digest("hex");
+  await prisma.file.upsert({
+    where: { id: opts.fileId },
+    update: { status: "ready" },
+    create: {
+      id: opts.fileId,
+      ownerId: opts.ownerId,
+      purpose: "lease-doc",
+      storageKey,
+      contentType: "application/pdf",
+      sizeBytes: BigInt(pdf.length),
+      checksumSha256: checksum,
+      isPublic: false,
+      status: "ready",
+    },
+  });
+  await prisma.contract.upsert({
+    where: { id: opts.contractId },
+    update: { status: opts.status },
+    create: {
+      id: opts.contractId,
+      tenancyId: opts.tenancyId,
+      kind: opts.kind,
+      source: "uploaded",
+      fileId: opts.fileId,
+      status: opts.status,
+      signedOn: opts.signedOn ? new Date(`${opts.signedOn}T00:00:00Z`) : null,
+    },
+  });
+}
+
+async function seedContracts(adminId: string) {
+  await ensureBucket();
+  await seedFileAndContract({
+    fileId: SEED_IDS.fileMapleSigned,
+    contractId: SEED_IDS.contractMapleSigned,
+    tenancyId: SEED_IDS.tenancyMapleActive,
+    ownerId: adminId,
+    kind: "lease",
+    status: "signed",
+    signedOn: "2024-08-20",
+    title: "AST Lease - Maple House - Tom Field (signed 2024)",
+    name: "maple-house-lease-2024.pdf",
+  });
+  await seedFileAndContract({
+    fileId: SEED_IDS.fileMapleOld,
+    contractId: SEED_IDS.contractMapleSuperseded,
+    tenancyId: SEED_IDS.tenancyMapleRenewed,
+    ownerId: adminId,
+    kind: "lease",
+    status: "superseded",
+    signedOn: "2023-08-25",
+    title: "AST Lease - Maple House - Tom Field (superseded 2023)",
+    name: "maple-house-lease-2023.pdf",
+  });
+  await seedFileAndContract({
+    fileId: SEED_IDS.fileQuayDraft,
+    contractId: SEED_IDS.contractQuayDraft,
+    tenancyId: SEED_IDS.tenancyQuayDraft,
+    ownerId: adminId,
+    kind: "lease",
+    status: "draft",
+    title: "AST Lease - Quay Flat - Priya Shah (draft)",
+    name: "quay-flat-lease-2026-draft.pdf",
+  });
+  await seedFileAndContract({
+    fileId: SEED_IDS.fileQuayEnded,
+    contractId: SEED_IDS.contractQuayIssued,
+    tenancyId: SEED_IDS.tenancyQuayEnded,
+    ownerId: adminId,
+    kind: "lease",
+    status: "issued",
+    title: "AST Lease - Quay Flat - Marcus Webb (issued 2024)",
+    name: "quay-flat-lease-2024.pdf",
+  });
+  console.log("Seeded 4 files + 4 contracts (draft/issued/signed/superseded)");
+}
+
 async function main() {
-  await seedUsers();
+  const { adminId } = await seedUsers();
   await seedProperties();
   await seedTenantsAndTenancies();
+  await seedContracts(adminId);
   console.log("Seed complete.");
 }
 

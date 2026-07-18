@@ -36,6 +36,24 @@ async function request<T>(path: string, init?: RequestInit): Promise<Envelope<T>
   return body as Envelope<T>;
 }
 
+/** Multipart upload to POST /api/v1/uploads. */
+export async function uploadFile(purpose: string, file: globalThis.File) {
+  const form = new FormData();
+  form.set("purpose", purpose);
+  form.set("file", file);
+  const res = await fetch("/api/v1/uploads", { method: "POST", body: form });
+  const body = await res.json().catch(() => null);
+  if (!res.ok) {
+    const err = body?.error;
+    throw new ApiClientError(
+      err?.code ?? "INTERNAL",
+      err?.message ?? `Upload failed (${res.status})`,
+      err?.details
+    );
+  }
+  return body as Envelope<import("./types").FileDto>;
+}
+
 export const api = {
   get: <T>(path: string) => request<T>(path),
   post: <T>(path: string, body?: unknown) =>

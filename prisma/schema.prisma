@@ -11,6 +11,47 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// ---- 0004_files_and_contracts ----
+
+model File {
+  id             String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId        String?    @map("owner_id") @db.Uuid
+  purpose        String
+  storageKey     String     @unique @map("storage_key")
+  contentType    String     @map("content_type")
+  sizeBytes      BigInt     @map("size_bytes")
+  checksumSha256 String?    @map("checksum_sha256")
+  isPublic       Boolean    @default(false) @map("is_public")
+  status         String     @default("pending")
+  variants       Json       @default("{}")
+  createdAt      DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  owner          User?      @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  contracts      Contract[]
+
+  @@index([ownerId], map: "idx_files_owner_id")
+  @@map("files")
+}
+
+model Contract {
+  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenancyId           String    @map("tenancy_id") @db.Uuid
+  kind                String
+  source              String
+  fileId              String    @map("file_id") @db.Uuid
+  generatedDocumentId String?   @map("generated_document_id") @db.Uuid
+  signedOn            DateTime? @map("signed_on") @db.Date
+  status              String    @default("draft")
+  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenancy             Tenancy   @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
+  file                File      @relation(fields: [fileId], references: [id], onDelete: Restrict)
+
+  @@index([tenancyId], map: "idx_contracts_tenancy_id")
+  @@index([fileId], map: "idx_contracts_file_id")
+  @@map("contracts")
+}
+
 // ---- 0001_users_and_settings ----
 
 model User {
@@ -23,6 +64,7 @@ model User {
   createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime      @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   settings    UserSettings?
+  files       File[]
 
   @@map("users")
 }
@@ -80,8 +122,9 @@ model Tenancy {
   status             String   @default("draft")
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  property           Property @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  tenant             Tenant   @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  property           Property   @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  tenant             Tenant     @relation(fields: [tenantId], references: [id], onDelete: Restrict)
+  contracts          Contract[]
 
   @@index([propertyId, status], map: "idx_tenancies_property_id_status")
   @@index([tenantId], map: "idx_tenancies_tenant_id")

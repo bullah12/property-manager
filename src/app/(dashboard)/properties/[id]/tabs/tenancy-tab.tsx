@@ -4,6 +4,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useState } from "react";
 import { toast } from "sonner";
 import { DateDisplay } from "@/components/date-display";
 import { Money } from "@/components/money";
@@ -50,9 +51,24 @@ export function TenancyTab({ property }: { property: PropertyDetailDto }) {
         .data,
   });
 
+  const [overrideTarget, setOverrideTarget] = useState<string | null>(null);
+
   const transition = useMutation({
-    mutationFn: async ({ id, action }: { id: string; action: "activate" | "end" | "renew" }) =>
-      (await api.post<TenancyDto>(`/api/v1/tenancies/${id}/${action}`)).data,
+    mutationFn: async ({
+      id,
+      action,
+      override,
+    }: {
+      id: string;
+      action: "activate" | "end" | "renew";
+      override?: boolean;
+    }) =>
+      (
+        await api.post<TenancyDto>(
+          `/api/v1/tenancies/${id}/${action}`,
+          action === "activate" && override ? { override: true } : undefined
+        )
+      ).data,
     onSuccess: (data, { action }) => {
       queryClient.invalidateQueries({ queryKey: ["tenancies"] });
       queryClient.invalidateQueries({ queryKey: ["property", property.id] });
@@ -63,8 +79,18 @@ export function TenancyTab({ property }: { property: PropertyDetailDto }) {
         toast.success(action === "activate" ? "Tenancy activated" : "Tenancy ended");
       }
     },
-    onError: (err) =>
-      toast.error(err instanceof ApiClientError ? err.message : "Action failed"),
+    onError: (err, { id, action }) => {
+      if (
+        action === "activate" &&
+        err instanceof ApiClientError &&
+        err.code === "CONFLICT" &&
+        err.message.includes("signed contract")
+      ) {
+        setOverrideTarget(id);
+        return;
+      }
+      toast.error(err instanceof ApiClientError ? err.message : "Action failed");
+    },
   });
 
   if (query.isLoading) return <Skeleton className="h-64 w-full" />;
@@ -254,6 +280,35 @@ export function TenancyTab({ property }: { property: PropertyDetailDto }) {
           )}
         </CardContent>
       </Card>
+
+      <AlertDialog
+        open={!!overrideTarget}
+        onOpenChange={(open) => !open && setOverrideTarget(null)}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>No signed contract on this tenancy</AlertDialogTitle>
+            <AlertDialogDescription>
+              The activation rule expects a signed contract first. You can
+              override and activate anyway (e.g. contract handled outside the
+              app).
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (overrideTarget) {
+                  transition.mutate({ id: overrideTarget, action: "activate", override: true });
+                }
+                setOverrideTarget(null);
+              }}
+            >
+              Activate with override
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   );
 }

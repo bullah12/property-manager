@@ -89,6 +89,40 @@ export interface TenantDetailDto extends TenantDto {
   tenancies: TenancyDto[];
 }
 
+export interface FileDto {
+  id: string;
+  purpose: string;
+  filename: string;
+  contentType: string;
+  sizeBytes: number;
+  checksumSha256: string | null;
+  status: "pending" | "ready" | "failed";
+  createdAt: string;
+}
+
+export type ContractStatus = "draft" | "issued" | "signed" | "superseded";
+
+export interface ContractDto {
+  id: string;
+  tenancyId: string;
+  kind: "lease" | "renewal" | "addendum";
+  source: "generated" | "uploaded";
+  fileId: string;
+  generatedDocumentId: string | null;
+  signedOn: string | null;
+  status: ContractStatus;
+  createdAt: string;
+  updatedAt: string;
+  file?: FileDto;
+  tenancy?: {
+    id: string;
+    startDate: string;
+    endDate: string;
+    status: TenancyStatus;
+    tenant?: { id: string; fullName: string };
+  };
+}
+
 export interface PropertyDetailDto extends PropertyDto {
   stats: {
     currentRentCents: number | null;

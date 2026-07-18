@@ -11,7 +11,7 @@ every phase.
 | 1 | Auth + settings | ✅ green | ✅ see below | — |
 | 2 | Properties | ✅ green | ✅ see below | — |
 | 3 | Tenants & tenancies | ✅ green | ✅ see below | Renewal chain: predecessor → `renewed` when the successor (same property+tenant) is activated; different tenant still active → 409 (single-occupancy, §8 Q13) |
-| 4 | File uploads + contract upload | — | — | — |
+| 4 | File uploads + contract upload | ✅ green | ✅ see below | — |
 | 5 | Expenses | — | — | — |
 | 6 | Monthly Income + Overview | — | — | — |
 | 7 | Compliance + reminders data | — | — | — |
@@ -160,6 +160,37 @@ GET /tenants/:marcus                          → tenancies: [(Quay Flat, ended)
                                                 — one tenant across two properties ✓
 ```
 **PASS** (walk-through rows removed afterwards; canonical seed remains)
+
+### Phase 4 — File Uploads + Contract Upload
+
+Migration: `db/migrations/0004_files_and_contracts.sql` (verbatim; the
+`generated_document_id` FK stays deferred to 0008). Private Supabase Storage
+bucket `files`; `POST /api/v1/uploads` (multipart, per-purpose size/type
+policies, magic-byte sniffing — declared content type is never trusted,
+server-generated storage keys, sha256 checksum, pending→ready);
+`GET /api/v1/files/:id/download` → 10-minute signed URL. Uploaded contracts:
+attach via `POST /tenancies/:id/contracts`, issue/sign/supersede transitions;
+Contracts tab (upload dialog, download, status badges, mark-issued/signed
+with optional signed-copy upload). Activation rule wired: activate requires a
+signed contract or `{override:true}` (UI shows an override confirm).
+Seed: 4 PDFs in storage + contracts in all four states.
+typecheck/lint/build green.
+
+Proof (2026-07-18, curl as admin):
+
+```
+POST /uploads (valid PDF, lease-doc)     → 201 {status:"ready", checksum, …}
+POST /uploads (text renamed .pdf)        → 400 VALIDATION_ERROR "File type not allowed"
+POST /uploads (26 MB PDF)                → 400 VALIDATION_ERROR "File is too large" (max 25 MB)
+POST /tenancies/:id/contracts {fileId}   → 201 kind=addendum source=uploaded status=draft
+POST /contracts/:id/issue                → status=issued
+POST /contracts/:id/sign {signedOn}      → status=signed, signedOn=2026-07-18
+GET  /files/:id/download                 → signed URL via kong /storage/v1/object/sign/…
+curl <signed url>                        → returns the original PDF bytes ✓
+POST /tenancies/:quayDraft/activate      → 409 "No signed contract … or activate with override"
+POST /tenancies/:temp/activate {override:true} → status=active ✓
+```
+**PASS** (proof rows removed; canonical seed remains)
 
 ### Phase 0 — details
 
