@@ -24,3 +24,6 @@ export const POST = apiHandler(async (req) => {
   const jobs = await runJobs(25);
   return ok({ ...result, jobsRan: jobs.ran });
 });
+
+// Vercel Cron sends GET requests (with the CRON_SECRET as a Bearer token).
+export const GET = POST;

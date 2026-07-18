@@ -55,11 +55,11 @@ payloads until then).
 - **Nothing is blocked.** Optional follow-ups for the owner:
   - **Real email:** set `RESEND_API_KEY` (+ `EMAIL_FROM`) in `.env` — until
     then `sendEmail()` runs in mock mode and logs each payload.
-  - **Deployment (§8 Q11):** everything here runs locally. For Vercel +
-    Supabase cloud, point the env vars at the hosted project, schedule the
-    two cron routes (daily-scan 08:00 Europe/London + run-jobs sweep) and
-    swap Chromium for `@sparticuz/chromium` in
-    `src/lib/contract-generation/render.ts` (`resolveChromiumPath`).
+  - **Deployment (§8 Q11):** Vercel prep is done — `vercel.json` schedules
+    the two cron routes, `printPdf()` swaps to `@sparticuz/chromium` when
+    `process.env.VERCEL` is set, and `docs/DEPLOYMENT.md` walks through
+    pointing the env vars at a hosted Supabase project and deploying. Owner
+    still needs to actually create the hosted project and Vercel deployment.
 - Note on seed state after the Phase 9 proof: the Quay Flat draft tenancy now
   carries the seeded uploaded lease as **superseded** plus a **generated**
   draft lease (and Maple has a generated renewal draft) — the four contract

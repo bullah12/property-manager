@@ -57,11 +57,23 @@ export function resolveChromiumPath(): string | undefined {
   return undefined; // let playwright-core resolve its default
 }
 
-export async function printPdf(html: string): Promise<Buffer> {
-  const browser = await chromium.launch({
+/** On Vercel there's no pre-installed Chromium, so use @sparticuz/chromium's serverless binary. */
+async function launchOptions() {
+  if (process.env.VERCEL) {
+    const sparticuzChromium = (await import("@sparticuz/chromium")).default;
+    return {
+      executablePath: await sparticuzChromium.executablePath(),
+      args: sparticuzChromium.args,
+    };
+  }
+  return {
     executablePath: resolveChromiumPath(),
     args: ["--no-sandbox", "--disable-dev-shm-usage"],
-  });
+  };
+}
+
+export async function printPdf(html: string): Promise<Buffer> {
+  const browser = await chromium.launch(await launchOptions());
   try {
     const page = await browser.newPage();
     await page.setContent(html, { waitUntil: "load" });
