@@ -11,14 +11,27 @@ import { removeFromStorage } from "@/lib/storage";
 
 type JobHandler = (job: Job) => Promise<void>;
 
-const handlers: Record<string, JobHandler> = {
-  "email.send": handleEmailSend,
-  "files.orphan_sweep": handleOrphanSweep,
+interface HandlerEntry {
+  run: JobHandler;
+  /** Invoked once when the job exhausts its retries and goes dead. */
+  onDead?: JobHandler;
+}
+
+const handlers: Record<string, HandlerEntry> = {
+  "email.send": { run: handleEmailSend },
+  "files.orphan_sweep": { run: handleOrphanSweep },
 };
 
-/** Phase 9 registers contract.generate here. */
-export function registerJobHandler(type: string, handler: JobHandler) {
-  handlers[type] = handler;
+/** Heavier handlers (contract.generate) register themselves on first load. */
+export function registerJobHandler(type: string, run: JobHandler, onDead?: JobHandler) {
+  handlers[type] = { run, onDead };
+}
+
+let extraHandlersLoaded = false;
+async function ensureExtraHandlers() {
+  if (extraHandlersLoaded) return;
+  extraHandlersLoaded = true;
+  await import("@/lib/contract-generation");
 }
 
 export async function enqueueJob(
@@ -37,6 +50,7 @@ const BACKOFF_BASE_SECONDS = 30;
  * thanks to SKIP LOCKED.
  */
 export async function runJobs(limit = 10): Promise<{ ran: number }> {
+  await ensureExtraHandlers();
   let ran = 0;
   for (;;) {
     const claimed = await prisma.$queryRaw<Job[]>`
@@ -54,19 +68,20 @@ export async function runJobs(limit = 10): Promise<{ ran: number }> {
     `;
     if (claimed.length === 0 || ran >= limit) break;
     const job = claimed[0];
-    const handler = handlers[job.type];
+    const entry = handlers[job.type];
     try {
-      if (!handler) throw new Error(`No handler for job type '${job.type}'`);
-      await handler(job);
+      if (!entry) throw new Error(`No handler for job type '${job.type}'`);
+      await entry.run(job);
       await prisma.job.update({ where: { id: job.id }, data: { status: "succeeded" } });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
       if (job.attempts >= job.maxAttempts) {
-        await prisma.job.update({
+        const deadJob = await prisma.job.update({
           where: { id: job.id },
           data: { status: "dead", lastError: message },
         });
         console.error(`[jobs] ${job.type} ${job.id} DEAD after ${job.attempts} attempts: ${message}`);
+        if (entry?.onDead) await entry.onDead(deadJob);
       } else {
         const backoffSeconds = BACKOFF_BASE_SECONDS * 2 ** (job.attempts - 1);
         await prisma.job.update({

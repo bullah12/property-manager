@@ -3,6 +3,18 @@
 Running log of the autonomous build (PLAN.md §7 phases 0–9). Updated after
 every phase.
 
+## Final status (2026-07-18)
+
+**All ten phases (0–9) are green.** Every phase's proof passed (details in
+the Proof log below); the final commit typechecks, lints, and builds clean.
+The app runs fully offline against the local Supabase stack — see "How to run
+locally". Sample generated lease: [`artifacts/sample-lease.pdf`](../artifacts/sample-lease.pdf)
+(pets + garden clauses on, produced by the §5.4 pipeline end-to-end).
+Deferred scope (Stripe rent collection, bank-CSV import, e-signature) was
+kept out per §8 Q2. Nothing is blocked; the only thing waiting on the owner
+is a real `RESEND_API_KEY` if real email delivery is wanted (mock mode logs
+payloads until then).
+
 ## Phase status
 
 | Phase | Deliverable | Status | Proof | Deviation from PLAN.md |
@@ -16,7 +28,7 @@ every phase.
 | 6 | Monthly Income + Overview | ✅ green | ✅ see below | Overview's "deadlines ≤30d" card reads 0 until the compliance table lands in Phase 7 (by design) |
 | 7 | Compliance + reminders data | ✅ green | ✅ see below | Overview "deadlines ≤30d" counts reminder rows (compliance **and** lease-expiry), since reminders are the deadline-as-data table |
 | 8 | Notification engine | ✅ green | ✅ see below | Email templates are typed HTML render functions behind `sendEmail()` (mock mode logs payloads — no Resend key in this environment); `GET /api/v1/reminders` added to power the inbox's "All upcoming deadlines" section (§4); `ALLOW_TEST_CLOCK=1` lets a production build honour `?today=` for local proofs |
-| 9 | Auto contract generation | — | — | — |
+| 9 | Auto contract generation | ✅ green | ✅ see below | PDF printing uses the environment's pre-installed Playwright Chromium (`playwright-core` + resolved executable path); deploy targets can swap in `@sparticuz/chromium` per §8 Q11 without touching the pipeline |
 
 ## Decisions
 
@@ -40,9 +52,19 @@ every phase.
 
 ## Blocked / needs me
 
-- Nothing blocking. Notes for later phases:
-  - **Resend (Phase 8):** will run in mock mode (logs payloads). Add a real
-    `RESEND_API_KEY` to `.env` to send real email.
+- **Nothing is blocked.** Optional follow-ups for the owner:
+  - **Real email:** set `RESEND_API_KEY` (+ `EMAIL_FROM`) in `.env` — until
+    then `sendEmail()` runs in mock mode and logs each payload.
+  - **Deployment (§8 Q11):** everything here runs locally. For Vercel +
+    Supabase cloud, point the env vars at the hosted project, schedule the
+    two cron routes (daily-scan 08:00 Europe/London + run-jobs sweep) and
+    swap Chromium for `@sparticuz/chromium` in
+    `src/lib/contract-generation/render.ts` (`resolveChromiumPath`).
+- Note on seed state after the Phase 9 proof: the Quay Flat draft tenancy now
+  carries the seeded uploaded lease as **superseded** plus a **generated**
+  draft lease (and Maple has a generated renewal draft) — the four contract
+  statuses all remain represented. Re-running `npm run db:seed` resets the
+  uploaded contract back to draft.
 
 ## How to run locally
 
@@ -329,6 +351,55 @@ Dead job visible (GET /jobs?status=dead → 1) → POST retry → pending →
 GET /api/v1/reminders → 5 deadlines across properties sorted by due date ✓
 ```
 **PASS** (notifications/jobs reset + reseeded to the canonical dataset after)
+
+### Phase 9 — Auto Contract Generation
+
+Migration: `db/migrations/0008_generated_documents.sql` (verbatim, completes
+the `contracts.generated_document_id` FK deferred from 0004). The spec's
+example template adopted verbatim into `templates/documents/lease/v1/template.html`
+(merge fields unchanged; template versions are directories — v2+ would sit
+alongside). §5.4 pipeline as a background `contract.generate` job:
+view-model builder with all legal formatting (`formatDateLong`,
+`numberToWords`, `moneyLegal` → "one thousand two hundred and fifty pounds
+(£1,250.00)", `ordinal`, `termMonths`), a Zod schema for `lease/v1` that
+fails loudly on any missing/empty field, Handlebars render, headless
+Chromium print-to-PDF (A4 + the template's own @page margins,
+`preferCSSPageSize`), stored via the files pattern
+(`generated-lease/<uuid>/lease-<short-id>.pdf`, private, checksummed),
+`generated_documents` row with the exact `input_snapshot`, `contracts` draft
+row (`source='generated'`), then `notify(contract.generated)` (in-app only
+per the §5.3 catalog; `contract.generation_failed` emails via the job's
+onDead hook). `POST /tenancies/:id/contracts/generate` → 202 + jobId, 409
+when a non-superseded contract of that kind exists. Contracts tab: Generate
+dialog (kind lease/renewal, clause toggles defaulted from Settings, pets
+description) + polling "Generating…" row. Golden-file test
+(`npm run test:golden`) renders lease/v1 with fixture data and diffs the PDF
+text layer against `tests/golden/lease-v1.txt`. typecheck/lint/build green.
+
+Proof (2026-07-18):
+
+```
+POST /tenancies/:quayDraft/contracts/generate (seeded draft lease exists)
+  → 409 CONFLICT "A non-superseded 'lease' contract already exists…" ✓
+POST /contracts/:seeded/supersede → superseded; re-generate {pets+garden on}
+  → 202 {"jobId":…}; job contract.generate → succeeded (1 attempt) ✓
+generated_documents row: doc_type=lease, template_version=lease/v1,
+  input_snapshot.clauses = {pets:true, petsDescription:"one small dog
+  (terrier)", garden:true}, rentAmountLegal="one thousand two hundred and
+  fifty pounds (£1,250.00)" ✓
+contracts row: kind=lease source=generated status=draft, FK to the
+  generated_documents row set ✓
+notification "Lease generated for Priya Shah at Quay Flat" created;
+  0 email jobs (contract.generated is in-app only) ✓
+Renewal off the expiry flow: generate kind=renewal on the Maple active
+  tenancy → renewal/generated/draft contract ✓
+Sample PDF downloaded via signed URL → artifacts/sample-lease.pdf
+  ("PDF document, version 1.4, 2 page(s)"; text layer shows the AST with
+  pets clause §4 and garden clause §5 present) ✓
+npm run test:golden → "PASS golden-lease: PDF text layer matches
+  tests/golden/lease-v1.txt" ✓
+```
+**PASS**
 
 ### Phase 0 — details
 

@@ -14,40 +14,42 @@ datasource db {
 // ---- 0004_files_and_contracts ----
 
 model File {
-  id              String           @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  ownerId         String?          @map("owner_id") @db.Uuid
-  purpose         String
-  storageKey      String           @unique @map("storage_key")
-  contentType     String           @map("content_type")
-  sizeBytes       BigInt           @map("size_bytes")
-  checksumSha256  String?          @map("checksum_sha256")
-  isPublic        Boolean          @default(false) @map("is_public")
-  status          String           @default("pending")
-  variants        Json             @default("{}")
-  createdAt       DateTime         @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt       DateTime         @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  owner           User?            @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  contracts       Contract[]
-  transactions    Transaction[]
-  complianceItems ComplianceItem[]
+  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  ownerId            String?             @map("owner_id") @db.Uuid
+  purpose            String
+  storageKey         String              @unique @map("storage_key")
+  contentType        String              @map("content_type")
+  sizeBytes          BigInt              @map("size_bytes")
+  checksumSha256     String?             @map("checksum_sha256")
+  isPublic           Boolean             @default(false) @map("is_public")
+  status             String              @default("pending")
+  variants           Json                @default("{}")
+  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  owner              User?               @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  contracts          Contract[]
+  transactions       Transaction[]
+  complianceItems    ComplianceItem[]
+  generatedDocuments GeneratedDocument[]
 
   @@index([ownerId], map: "idx_files_owner_id")
   @@map("files")
 }
 
 model Contract {
-  id                  String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  tenancyId           String    @map("tenancy_id") @db.Uuid
+  id                  String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  tenancyId           String             @map("tenancy_id") @db.Uuid
   kind                String
   source              String
-  fileId              String    @map("file_id") @db.Uuid
-  generatedDocumentId String?   @map("generated_document_id") @db.Uuid
-  signedOn            DateTime? @map("signed_on") @db.Date
-  status              String    @default("draft")
-  createdAt           DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt           DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  tenancy             Tenancy   @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
-  file                File      @relation(fields: [fileId], references: [id], onDelete: Restrict)
+  fileId              String             @map("file_id") @db.Uuid
+  generatedDocumentId String?            @map("generated_document_id") @db.Uuid
+  signedOn            DateTime?          @map("signed_on") @db.Date
+  status              String             @default("draft")
+  createdAt           DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenancy             Tenancy            @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
+  file                File               @relation(fields: [fileId], references: [id], onDelete: Restrict)
+  generatedDocument   GeneratedDocument? @relation(fields: [generatedDocumentId], references: [id], onDelete: SetNull, map: "fk_contracts_generated_document_id")
 
   @@index([tenancyId], map: "idx_contracts_tenancy_id")
   @@index([fileId], map: "idx_contracts_file_id")
@@ -228,6 +230,25 @@ model Job {
 
   @@index([status, runAt], map: "idx_jobs_status_run_at")
   @@map("jobs")
+}
+
+// ---- 0008_generated_documents ----
+
+model GeneratedDocument {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  docType         String     @map("doc_type")
+  templateVersion String     @map("template_version")
+  subjectType     String     @map("subject_type")
+  subjectId       String     @map("subject_id") @db.Uuid
+  fileId          String     @map("file_id") @db.Uuid
+  inputSnapshot   Json       @map("input_snapshot")
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  file            File       @relation(fields: [fileId], references: [id], onDelete: Restrict)
+  contracts       Contract[]
+
+  @@index([subjectType, subjectId], map: "idx_generated_documents_subject")
+  @@index([fileId], map: "idx_generated_documents_file_id")
+  @@map("generated_documents")
 }
 
 model UserSettings {

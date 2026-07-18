@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Upload } from "lucide-react";
+import { Download, Loader2, Sparkles, Upload } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { DateDisplay } from "@/components/date-display";
@@ -41,13 +41,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { Checkbox } from "@/components/ui/checkbox";
 import { api, ApiClientError, uploadFile } from "@/lib/api-client";
 import { toDateOnly } from "@/lib/dates";
-import type { ContractDto, PropertyDetailDto, TenancyDto } from "@/lib/types";
+import { useMe } from "@/hooks/use-me";
+import type { ContractDto, JobDto, PropertyDetailDto, TenancyDto } from "@/lib/types";
 
 export function ContractsTab({ property }: { property: PropertyDetailDto }) {
   const queryClient = useQueryClient();
   const [uploadOpen, setUploadOpen] = useState(false);
+  const [generateOpen, setGenerateOpen] = useState(false);
+  const [generating, setGenerating] = useState(false);
   const [signTarget, setSignTarget] = useState<ContractDto | null>(null);
 
   const query = useQuery({
@@ -61,12 +65,29 @@ export function ContractsTab({ property }: { property: PropertyDetailDto }) {
           async (t) => (await api.get<ContractDto[]>(`/api/v1/tenancies/${t.id}/contracts`)).data
         )
       );
-      return { tenancies, contracts: perTenancy.flat() };
+      const pendingJobs = generating
+        ? (await api.get<JobDto[]>("/api/v1/jobs?status=pending&perPage=50")).data.filter(
+            (j) => j.type === "contract.generate"
+          )
+        : [];
+      const runningJobs = generating
+        ? (await api.get<JobDto[]>("/api/v1/jobs?status=running&perPage=50")).data.filter(
+            (j) => j.type === "contract.generate"
+          )
+        : [];
+      return { tenancies, contracts: perTenancy.flat(), inFlight: pendingJobs.length + runningJobs.length };
     },
+    // Poll while a generation job is in flight ("Generating…" row).
+    refetchInterval: generating ? 1500 : false,
   });
 
   const invalidate = () =>
     queryClient.invalidateQueries({ queryKey: ["contracts", { propertyId: property.id }] });
+
+  if (generating && query.data && query.data.inFlight === 0) {
+    setGenerating(false);
+    toast.success("Contract generated");
+  }
 
   const download = async (fileId: string) => {
     try {
@@ -113,23 +134,34 @@ export function ContractsTab({ property }: { property: PropertyDetailDto }) {
             <div>
               <CardTitle className="text-base">Contracts</CardTitle>
               <CardDescription>
-                Across all tenancies on this property. Generated leases arrive in
-                Phase 9 — uploads work now.
+                Across all tenancies on this property — uploaded scans and
+                generated leases.
               </CardDescription>
             </div>
-            <Button
-              size="sm"
-              onClick={() => setUploadOpen(true)}
-              disabled={uploadableTenancies.length === 0}
-            >
-              <Upload className="size-4" /> Upload contract
-            </Button>
+            <div className="flex gap-2">
+              <Button
+                size="sm"
+                variant="outline"
+                onClick={() => setUploadOpen(true)}
+                disabled={uploadableTenancies.length === 0}
+              >
+                <Upload className="size-4" /> Upload contract
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setGenerateOpen(true)}
+                disabled={uploadableTenancies.length === 0 || generating}
+              >
+                <Sparkles className="size-4" /> Generate contract
+              </Button>
+            </div>
           </div>
         </CardHeader>
         <CardContent>
-          {contracts.length === 0 ? (
+          {contracts.length === 0 && !generating ? (
             <p className="text-sm text-muted-foreground">
-              No contracts yet. Upload a scanned lease to get started.
+              No contracts yet. Upload a scanned lease or generate one from the
+              tenancy details.
             </p>
           ) : (
             <div className="overflow-x-auto">
@@ -145,6 +177,15 @@ export function ContractsTab({ property }: { property: PropertyDetailDto }) {
                   </TableRow>
                 </TableHeader>
                 <TableBody>
+                  {generating ? (
+                    <TableRow>
+                      <TableCell colSpan={6} className="text-center text-sm text-muted-foreground">
+                        <span className="inline-flex items-center gap-2">
+                          <Loader2 className="size-4 animate-spin" /> Generating…
+                        </span>
+                      </TableCell>
+                    </TableRow>
+                  ) : null}
                   {contracts.map((c) => (
                     <TableRow key={c.id}>
                       <TableCell className="capitalize">{c.kind}</TableCell>
@@ -209,6 +250,15 @@ export function ContractsTab({ property }: { property: PropertyDetailDto }) {
         onOpenChange={setUploadOpen}
         tenancies={uploadableTenancies}
         onDone={invalidate}
+      />
+      <GenerateContractDialog
+        open={generateOpen}
+        onOpenChange={setGenerateOpen}
+        tenancies={uploadableTenancies}
+        onQueued={() => {
+          setGenerating(true);
+          invalidate();
+        }}
       />
       <SignContractDialog
         contract={signTarget}
@@ -383,6 +433,133 @@ function SignContractDialog({
           </Button>
           <Button onClick={submit} disabled={busy || !signedOn}>
             {busy ? "Saving…" : "Mark signed"}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+function GenerateContractDialog({
+  open,
+  onOpenChange,
+  tenancies,
+  onQueued,
+}: {
+  open: boolean;
+  onOpenChange: (open: boolean) => void;
+  tenancies: TenancyDto[];
+  onQueued: () => void;
+}) {
+  const { data: me } = useMe();
+  const [tenancyId, setTenancyId] = useState("");
+  const [kind, setKind] = useState<"lease" | "renewal">("lease");
+  const [pets, setPets] = useState(false);
+  const [petsDescription, setPetsDescription] = useState("");
+  const [garden, setGarden] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [defaultsApplied, setDefaultsApplied] = useState(false);
+
+  // Clause toggles default from Settings (PLAN.md §4).
+  if (me && !defaultsApplied) {
+    setPets(me.settings.clausePetsDefault);
+    setGarden(me.settings.clauseGardenDefault);
+    setDefaultsApplied(true);
+  }
+
+  const submit = async () => {
+    const target = tenancyId || tenancies[0]?.id;
+    if (!target) return;
+    if (pets && !petsDescription.trim()) {
+      toast.error("Describe the pet(s) for the pets clause");
+      return;
+    }
+    setBusy(true);
+    try {
+      await api.post(`/api/v1/tenancies/${target}/contracts/generate`, {
+        kind,
+        clauses: {
+          pets,
+          ...(pets ? { petsDescription: petsDescription.trim() } : {}),
+          garden,
+        },
+      });
+      toast.success("Generation queued");
+      onQueued();
+      onOpenChange(false);
+    } catch (err) {
+      toast.error(err instanceof ApiClientError ? err.message : "Failed to queue generation");
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>Generate contract</DialogTitle>
+          <DialogDescription>
+            Renders the lease/v1 template with this tenancy&apos;s details into a
+            draft PDF contract (runs in the background).
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div className="space-y-2">
+            <Label>Tenancy</Label>
+            <Select value={tenancyId || tenancies[0]?.id || ""} onValueChange={setTenancyId}>
+              <SelectTrigger className="w-full">
+                <SelectValue placeholder="Pick a tenancy" />
+              </SelectTrigger>
+              <SelectContent>
+                {tenancies.map((t) => (
+                  <SelectItem key={t.id} value={t.id}>
+                    {t.tenant?.fullName ?? "Tenant"} · {t.startDate} → {t.endDate} ({t.status})
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label>Kind</Label>
+            <Select value={kind} onValueChange={(v) => setKind(v as typeof kind)}>
+              <SelectTrigger className="w-full">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="lease">Lease</SelectItem>
+                <SelectItem value="renewal">Renewal</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-3 rounded-md border p-3">
+            <div className="flex items-center gap-2">
+              <Checkbox checked={pets} onCheckedChange={(v) => setPets(!!v)} id="gen-pets" />
+              <Label htmlFor="gen-pets" className="font-normal">
+                Pets clause
+              </Label>
+            </div>
+            {pets ? (
+              <Input
+                placeholder="e.g. one small dog (terrier)"
+                value={petsDescription}
+                onChange={(e) => setPetsDescription(e.target.value)}
+              />
+            ) : null}
+            <div className="flex items-center gap-2">
+              <Checkbox checked={garden} onCheckedChange={(v) => setGarden(!!v)} id="gen-garden" />
+              <Label htmlFor="gen-garden" className="font-normal">
+                Garden maintenance clause
+              </Label>
+            </div>
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button onClick={submit} disabled={busy}>
+            {busy ? "Queuing…" : "Generate"}
           </Button>
         </DialogFooter>
       </DialogContent>
