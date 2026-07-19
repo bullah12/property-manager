@@ -40,6 +40,29 @@ export async function activateTenancy(
     );
   }
 
+  if (conflicting && tenancy.startDate <= conflicting.endDate) {
+    throw conflict(
+      "The new tenancy overlaps the current tenancy — set its start date after the current tenancy ends"
+    );
+  }
+
+  const overlappingPast = await prisma.tenancy.findFirst({
+    where: {
+      propertyId: tenancy.propertyId,
+      id: { not: id },
+      startDate: { lte: tenancy.endDate },
+      OR: [
+        { status: "ended", endedOn: { gte: tenancy.startDate } },
+        { status: "renewed", endDate: { gte: tenancy.startDate } },
+      ],
+    },
+  });
+  if (overlappingPast) {
+    throw conflict(
+      "The new tenancy overlaps a previous tenancy — set its start date after the previous tenancy ended"
+    );
+  }
+
   return prisma.$transaction(async (tx) => {
     if (conflicting) {
       // Renewal chain: predecessor → 'renewed' on successor activation.
@@ -59,8 +82,8 @@ export async function activateTenancy(
   });
 }
 
-/** active → ended. */
-export async function endTenancy(id: string) {
+/** active → ended, recording the date on which rent expectations stop. */
+export async function endTenancy(id: string, endedOn: Date) {
   const tenancy = await getTenancyOr404(id);
   if (tenancy.status !== "active") {
     throw conflict(`Only an active tenancy can be ended (status: ${tenancy.status})`);
@@ -68,7 +91,12 @@ export async function endTenancy(id: string) {
   return prisma.$transaction(async (tx) => {
     const updated = await tx.tenancy.update({
       where: { id },
-      data: { status: "ended" },
+      data: {
+        status: "ended",
+        // A tenancy ended after its fixed term has no expectations beyond the
+        // contractual end date, so keep the effective cutoff within the term.
+        endedOn: endedOn < tenancy.endDate ? endedOn : tenancy.endDate,
+      },
       include: { tenant: true, property: true },
     });
     await deleteReminder(tx, "tenancy", id);

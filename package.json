@@ -14,7 +14,8 @@
     "db:migrate": "tsx scripts/db/migrate.ts",
     "db:seed": "tsx db/seed.ts",
     "db:generate": "prisma generate",
-    "test:golden": "tsx tests/golden-lease.test.ts"
+    "test:golden": "tsx tests/golden-lease.test.ts",
+    "test:income": "tsx --test tests/income.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",

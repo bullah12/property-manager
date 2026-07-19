@@ -163,7 +163,8 @@ export function TenancyTab({ property }: { property: PropertyDetailDto }) {
                         <AlertDialogHeader>
                           <AlertDialogTitle>End this tenancy?</AlertDialogTitle>
                           <AlertDialogDescription>
-                            Marks the tenancy as ended. This cannot be undone.
+                            Marks the tenancy as ended today and stops future rent from being
+                            expected. This cannot be undone.
                           </AlertDialogDescription>
                         </AlertDialogHeader>
                         <AlertDialogFooter>
@@ -263,7 +264,7 @@ export function TenancyTab({ property }: { property: PropertyDetailDto }) {
                         <DateDisplay iso={t.startDate} />
                       </TableCell>
                       <TableCell>
-                        <DateDisplay iso={t.endDate} />
+                        <DateDisplay iso={t.endedOn ?? t.endDate} />
                       </TableCell>
                       <TableCell>
                         <Money cents={t.rentAmountCents} />

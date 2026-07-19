@@ -72,6 +72,7 @@ export interface TenancyDto {
   tenantId: string;
   startDate: string;
   endDate: string;
+  endedOn: string | null;
   rentAmountCents: number;
   rentDueDay: number;
   depositAmountCents: number | null;

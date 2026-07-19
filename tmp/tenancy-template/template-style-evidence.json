@@ -1,0 +1,170 @@
+{
+  "input": "/Users/abdullah.taj/Downloads/Tenancy_Agreement_322AlumRockRoad_Updated_2026.docx",
+  "fonts_by_char_count": {
+    "Arial": 17222
+  },
+  "direct_run_formatting_runs": 168,
+  "direct_paragraph_formatting_paragraphs": 140,
+  "heading_like_paragraphs_not_heading_style": [
+    {
+      "para_index": 2,
+      "text": "ASSURED PERIODIC TENANCY AGREEMENT",
+      "style": ""
+    },
+    {
+      "para_index": 3,
+      "text": "(Under the Renters' Rights Act 2025)",
+      "style": ""
+    },
+    {
+      "para_index": 9,
+      "text": "Zulfiqar Ali Taj",
+      "style": ""
+    },
+    {
+      "para_index": 14,
+      "text": "Noreen Akhtar",
+      "style": ""
+    },
+    {
+      "para_index": 21,
+      "text": "IMPORTANT NOTICE TO BOTH PARTIES",
+      "style": ""
+    },
+    {
+      "para_index": 24,
+      "text": "1. The Property",
+      "style": ""
+    },
+    {
+      "para_index": 28,
+      "text": "322 Alum Rock Rd, Alum Rock, Birmingham B8 3DD, UK",
+      "style": ""
+    },
+    {
+      "para_index": 34,
+      "text": "2. Term and Nature of Tenancy",
+      "style": ""
+    },
+    {
+      "para_index": 42,
+      "text": "3. Rent",
+      "style": ""
+    },
+    {
+      "para_index": 47,
+      "text": "4. Rent Increases",
+      "style": ""
+    },
+    {
+      "para_index": 53,
+      "text": "5. Security Deposit",
+      "style": ""
+    },
+    {
+      "para_index": 71,
+      "text": "6. Pets",
+      "style": ""
+    },
+    {
+      "para_index": 78,
+      "text": "7. Access and Inspection",
+      "style": ""
+    },
+    {
+      "para_index": 83,
+      "text": "8. Tenant Improvements",
+      "style": ""
+    },
+    {
+      "para_index": 93,
+      "text": "9. Utilities and Other Charges",
+      "style": ""
+    },
+    {
+      "para_index": 96,
+      "text": "10. Insurance",
+      "style": ""
+    },
+    {
+      "para_index": 100,
+      "text": "11. Absences",
+      "style": ""
+    },
+    {
+      "para_index": 106,
+      "text": "12. Assignment and Subletting",
+      "style": ""
+    },
+    {
+      "para_index": 110,
+      "text": "13. Damage to Property",
+      "style": ""
+    },
+    {
+      "para_index": 113,
+      "text": "14. Maintenance and Repairs",
+      "style": ""
+    }
+  ],
+  "examples": {
+    "direct_run_formatting": [
+      {
+        "para_index": 2,
+        "run_text": "ASSURED PERIODIC TENANCY AGREEMENT",
+        "style": ""
+      },
+      {
+        "para_index": 3,
+        "run_text": "(Under the Renters' Rights Act 2025)",
+        "style": ""
+      },
+      {
+        "para_index": 5,
+        "run_text": "THIS AGREEMENT is made on ________ day of ________________, ________",
+        "style": ""
+      },
+      {
+        "para_index": 7,
+        "run_text": "BETWEEN:",
+        "style": ""
+      },
+      {
+        "para_index": 9,
+        "run_text": "Zulfiqar Ali Taj",
+        "style": ""
+      }
+    ],
+    "direct_paragraph_formatting": [
+      {
+        "para_index": 19,
+        "text": "IN CONSIDERATION OF the Landlord granting a tenancy of the premises to the Tenant, the Parties agree as follows:",
+        "style": ""
+      },
+      {
+        "para_index": 21,
+        "text": "IMPORTANT NOTICE TO BOTH PARTIES",
+        "style": ""
+      },
+      {
+        "para_index": 22,
+        "text": "This Agreement creates an Assured Periodic Tenancy (APT) under the Renters' Rights Act 2025 and the Housing Act 1988 (as",
+        "style": ""
+      },
+      {
+        "para_index": 24,
+        "text": "1. The Property",
+        "style": ""
+      },
+      {
+        "para_index": 25,
+        "text": "1.1  The Landlord is the owner of residential property and is legally entitled to grant this tenancy.",
+        "style": ""
+      }
+    ]
+  },
+  "notes": [
+    "Direct formatting is not always wrong, but it often causes inconsistent output when templates change.",
+    "Heading-like paragraphs not using Heading styles can break TOC and accessibility."
+  ]
+}

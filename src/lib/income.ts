@@ -18,12 +18,20 @@ export interface RentPeriod {
   expectedCents: number;
 }
 
+type RentTerm = Pick<
+  Tenancy,
+  "startDate" | "endDate" | "endedOn" | "rentDueDay" | "rentAmountCents"
+>;
+
 export function deriveRentPeriods(
-  tenancy: Pick<Tenancy, "startDate" | "endDate" | "rentDueDay" | "rentAmountCents">,
+  tenancy: RentTerm,
   year: number
 ): RentPeriod[] {
   const start = tenancy.startDate;
-  const end = tenancy.endDate;
+  const end =
+    tenancy.endedOn && tenancy.endedOn < tenancy.endDate
+      ? tenancy.endedOn
+      : tenancy.endDate;
   const from = new Date(
     Math.max(firstOfMonth(start).getTime(), Date.UTC(year, 0, 1))
   );
@@ -82,6 +90,7 @@ export interface IncomeRow {
     status: string;
     startDate: string;
     endDate: string;
+    endedOn: string | null;
     rentAmountCents: number;
     rentDueDay: number;
     tenant: { id: string; fullName: string } | null;
@@ -108,14 +117,20 @@ export async function computeIncomeGrid(opts: {
 }): Promise<IncomeGrid> {
   const { propertyId, year, today, graceDays } = opts;
 
-  // Active + ended + renewed tenancies overlapping the year (drafts have no
-  // rent expectation yet).
+  const yearStart = parseDateOnly(`${year}-01-01`);
+  const yearEnd = parseDateOnly(`${year}-12-31`);
+
+  // Active + ended + renewed tenancies whose effective term overlaps the
+  // year (drafts have no rent expectation yet). An early-ended tenancy stops
+  // at endedOn rather than continuing to its original contractual end date.
   const tenancies = await prisma.tenancy.findMany({
     where: {
       propertyId,
-      status: { in: ["active", "ended", "renewed"] },
-      startDate: { lte: parseDateOnly(`${year}-12-31`) },
-      endDate: { gte: parseDateOnly(`${year}-01-01`) },
+      startDate: { lte: yearEnd },
+      OR: [
+        { status: { in: ["active", "renewed"] }, endDate: { gte: yearStart } },
+        { status: "ended", endedOn: { gte: yearStart } },
+      ],
     },
     include: { tenant: true },
     orderBy: { startDate: "asc" },
@@ -187,6 +202,7 @@ export async function computeIncomeGrid(opts: {
         status: t.status,
         startDate: toDateOnly(t.startDate),
         endDate: toDateOnly(t.endDate),
+        endedOn: t.endedOn ? toDateOnly(t.endedOn) : null,
         rentAmountCents: t.rentAmountCents,
         rentDueDay: t.rentDueDay,
         tenant: t.tenant ? { id: t.tenant.id, fullName: t.tenant.fullName } : null,

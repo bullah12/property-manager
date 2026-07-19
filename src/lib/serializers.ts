@@ -71,6 +71,7 @@ export function serializeTenancy(
     tenantId: t.tenantId,
     startDate: toDateOnly(t.startDate),
     endDate: toDateOnly(t.endDate),
+    endedOn: t.endedOn ? toDateOnly(t.endedOn) : null,
     rentAmountCents: t.rentAmountCents,
     rentDueDay: t.rentDueDay,
     depositAmountCents: t.depositAmountCents,
