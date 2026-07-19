@@ -1,6 +1,6 @@
 /**
  * Golden-file test (pdf-document-generation skill): render lease/v1 with
- * fixture data, print to PDF, extract the text layer and diff it against
+ * fixture data, write a PDF, extract the text layer and diff it against
  * tests/golden/lease-v1.txt — catches template/layout regressions.
  *
  * Run: npm run test:golden           (compares)
@@ -10,7 +10,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
-import { printPdf, renderLeaseHtml } from "../src/lib/contract-generation/render";
+import { renderLeasePdf } from "../src/lib/contract-generation/render";
 import { leaseV1Schema } from "../src/lib/contract-generation/view-model";
 import "dotenv/config";
 
@@ -52,14 +52,16 @@ async function extractText(pdf: Buffer): Promise<string> {
   return result.text
     .split("\n")
     .map((l: string) => l.replace(/\s+/g, " ").trim())
-    .filter((l: string) => l.length > 0)
+    .filter(
+      (l: string) =>
+        l.length > 0 && !/^-- \d+ of \d+ --$/.test(l) && !/^Page \d+ of \d+$/.test(l)
+    )
     .join("\n");
 }
 
 async function main() {
   const update = process.argv.includes("--update");
-  const html = renderLeaseHtml(fixture);
-  const pdf = await printPdf(html);
+  const pdf = renderLeasePdf(fixture);
   const text = await extractText(pdf);
 
   if (update) {

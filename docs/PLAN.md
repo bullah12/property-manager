@@ -82,7 +82,7 @@ exactly; only the framework carrying them changes.
 | File storage | **Supabase Storage**, private buckets only, short-lived signed GET URLs (5–15 min) | `file-storage-uploads` skill: private files, presigned GET; simple multipart upload through the API is explicitly allowed for this internal tool |
 | Jobs & cron | Postgres **`jobs` table** (durable queue per the skill's stack-agnostic core) + a runner invoked by **Vercel Cron** (or node-cron if self-hosted) hitting a secret-guarded internal route; daily 08:00 scan is a cron entry | pg-boss needs a long-lived worker, which a serverless Next.js deploy doesn't have; the skill's core ("durable queue in the database + idempotent handlers") is kept. See §8 Q11 (deployment target) |
 | Email | **Resend** via a thin `sendEmail()` wrapper; React Email templates | `notifications-scheduling` skill default, swappable provider |
-| PDF generation | **HTML (Handlebars) → headless Chromium print-to-PDF**; `puppeteer-core` + `@sparticuz/chromium` on serverless, Playwright locally/self-hosted | `pdf-document-generation` skill default; template already exists (`lease/v1`) |
+| PDF generation | **Direct TypeScript PDF writer** with deterministic A4 layout, wrapping, pagination, searchable text, and standard PDF fonts | No browser executable or platform-specific binary is required; wording remains versioned as `lease/v1` |
 | Frontend UI | **shadcn/ui + Tailwind CSS**, **TanStack Query** (server state), **TanStack Table** (`<DataTable>` wrapper), **react-hook-form + Zod**, **Recharts** | `dashboard-ui-patterns` skill defaults, unchanged — only Vite/React Router are replaced by Next.js routing |
 | Payments (deferred) | Stripe per `payments-billing` skill | Only if the deferred rent-collection phase is ever activated |
 
@@ -704,8 +704,8 @@ Job handler:
      clauses.pets / .petsDescription / .garden          # explicit booleans
 3. VALIDATE with the Zod schema for template version 'lease/v1' —
    a missing/empty field fails the job loudly; a blank never renders
-4. RENDER  Handlebars template 'templates/documents/lease/v1/' → HTML
-5. PRINT   headless Chromium → PDF (A4, @page margins from the template)
+4. LAYOUT  lease/v1 directly into A4 pages (wrapping + pagination)
+5. WRITE   a searchable PDF buffer with no browser/runtime process
 6. STORE   via the files pattern: purpose='generated-lease', private,
            storage_key='generated-lease/<uuid>/lease-<tenancy-short-id>.pdf',
            checksum recorded, status='ready'
@@ -716,11 +716,11 @@ Job handler:
 9. notify(owner, 'contract.generated', link to the Contracts tab)
 ```
 
-Rules carried over verbatim: generation always in a background job
-(Chromium is heavy); signed/issued documents are never regenerated —
+Rules carried over verbatim: generation always runs in a background job
+for durable retries and storage; signed/issued documents are never regenerated —
 generate a new row, supersede the old; template changes bump the version
 directory (`lease/v2/…`) and old versions stay in the repo;
-`input_snapshot` makes every contract reproducible; fonts embedded;
+`input_snapshot` makes every contract reproducible; standard PDF fonts are used;
 golden-file test renders `lease/v1` with fixture data and diffs the PDF
 text layer.
 
@@ -834,7 +834,7 @@ seed data.
 | **6** | **Monthly Income + Overview.** §5.1 compute-on-read; `GET /properties/:id/income?year=`; Monthly Income grid per §4 wireframe 2 (record-payment popover → rent transaction, corrections on paid cells, yearly chart); `GET /stats/overview` + Overview screen (stats row #4 + recent activity). **Not included:** overdue *notifications* (display-only statuses here; alerts land in Phase 8). | 5 |
 | **7** | **Compliance items + reminders data.** Migration 0006; compliance CRUD + complete-with-rollover (§5.2, including document upload); reminder upsert hooks on compliance *and* tenancy writes (lease-expiry reminders now armed, backfilled for existing seed tenancies); property Notifications tab (status chips, mark-complete dialog, lead-day override); add-compliance prompt after property create (flow 1, UK-default presets); compliance seed. **Not included:** the daily scan, notifications table, email — nothing *fires* yet. | 3 (tenancy hooks), 4 (cert upload); UI slots into 2's detail shell |
 | **8** | **Notification engine.** Migration 0007; `notify()` + dedupe; jobs table + runner (claim via `FOR UPDATE SKIP LOCKED`, retries, dead state) + cron routes with `CRON_SECRET`; daily 08:00 scan wired to §5.2 leads + §5.1 rent-overdue pass; Resend email via queued `email.send`; Notifications inbox screen + sidebar badge; files orphan sweep; failed-job count on Settings; test-clock support (`?today=` on the internal scan route, dev only). **Not included:** contract generation. | 5+6 (overdue pass), 7 (reminders to scan) |
-| **9** | **Auto contract generation.** Migration 0008; `templates/documents/lease/v1/` adopted from the spec's example template; §5.4 pipeline end-to-end (view-model builder with legal formatting, Zod-per-template-version, Handlebars, Chromium print, store, `generated_documents`, contract `draft`, notify); generate action + "Generating…" state in Contracts tab; clause toggles from tenancy/settings; golden-file PDF test; renewal generation (`kind='renewal'`) off the expiry flow. **Not included:** e-signature; template `v2`+. | 4 (files/contracts), 8 (jobs + notify) |
+| **9** | **Auto contract generation.** Migration 0008; `templates/documents/lease/v1/` preserves the versioned wording; §5.4 pipeline end-to-end (view-model builder with legal formatting, Zod-per-template-version, direct A4 PDF layout/write, store, `generated_documents`, contract `draft`, notify); generate action + "Generating…" state in Contracts tab; clause toggles from tenancy/settings; golden-file PDF test; renewal generation (`kind='renewal'`) off the expiry flow. **Not included:** e-signature; template `v2`+. | 4 (files/contracts), 8 (jobs + notify) |
 
 **Deferred scope (not in the roadmap, no prompts written):** Stripe rent
 collection (`payments-billing` skill, auto-writing rent transactions via
@@ -845,8 +845,8 @@ stay out until explicitly requested; the schema already leaves room
 Sequencing rationale: 0–6 is the spec's "Phase 1" (a fully usable manual
 tracker — you could run the portfolio on it), 7–9 is the spec's "Phase 2"
 split into data (7), engine (8), and the one feature needing both plus
-Chromium (9). Riskiest integrations (email, Chromium) land last and
-isolated.
+the background-job/storage pipeline (9). Riskier external integrations
+land last and remain isolated.
 
 ---
 
@@ -926,11 +926,11 @@ than by query-before-insert. Flagging since the skill schema was otherwise
 adopted verbatim.
 
 **Q11. Deployment target.** Vercel + Supabase cloud is assumed (Vercel
-Cron for the two internal routes; `@sparticuz/chromium` for PDFs within a
-route's execution limits). If you'd rather self-host (a Docker box you
-control), Playwright + node-cron are simpler and pg-boss becomes viable
-again — it changes Phase 8/9 implementation details but no interfaces.
-Decide by end of Phase 6 (first phase that doesn't care is 0–6).
+Cron for the two internal routes). PDF generation is direct TypeScript and
+has no browser or platform binary dependency. If you'd rather self-host (a
+Docker box you control), node-cron and pg-boss become viable again — it
+changes Phase 8/9 implementation details but no interfaces. Decide by end
+of Phase 6 (first phase that doesn't care is 0–6).
 
 **Q12. Rent-overdue grace period.** Spec says "N days past due". Defaulted
 to **3 days**, configurable in Settings (`rent_overdue_grace_days`).

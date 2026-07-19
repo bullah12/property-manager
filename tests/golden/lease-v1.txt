@@ -5,8 +5,8 @@ Property: Flat 12, Harbour Quay, 3 Dockside Road, Bristol, BS1 4RT
 1. Term
 The tenancy begins on 1 August 2026 and ends on 31 July 2027, being a fixed term of twelve months.
 2. Rent
-The rent is one thousand two hundred and fifty pounds (£1,250.00) per calendar month, payable in
-advance on the 5th day of each month.
+The rent is one thousand two hundred and fifty pounds (£1,250.00) per calendar month, payable in advance
+on the 5th day of each month.
 3. Deposit
 A deposit of one thousand four hundred and forty-two pounds (£1,442.00) is held under the mydeposits
 (custodial) scheme (reference MYD-88104).
@@ -16,7 +16,5 @@ The Tenant may keep the following pet(s) at the Property: one small dog (terrier
 The Tenant shall keep the garden in a tidy condition.
 Signed by the Landlord:
 Date:
--- 1 of 2 --
 Signed by the Tenant:
 Date:
--- 2 of 2 --

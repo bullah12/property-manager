@@ -5,13 +5,13 @@ import { prisma } from "@/lib/db";
 import { enqueueJob, registerJobHandler } from "@/lib/jobs";
 import { getOwner, notify } from "@/lib/notify";
 import { uploadToStorage } from "@/lib/storage";
-import { printPdf, renderLeaseHtml } from "./render";
+import { renderLeasePdf } from "./render";
 import { buildLeaseViewModel, TEMPLATE_VERSION, type ClauseInput } from "./view-model";
 
 /**
- * §5.4 contract-generation pipeline. Generation always runs in a background
- * job (Chromium is heavy); signed/issued documents are never regenerated in
- * place — a new contract row supersedes.
+ * §5.4 contract-generation pipeline. Generation runs in a background job for
+ * durable document creation and storage retries; signed/issued documents are
+ * never regenerated in place — a new contract row supersedes.
  */
 
 export interface GeneratePayload {
@@ -60,9 +60,8 @@ async function handleContractGenerate(job: Job) {
     clauses: payload.clauses,
   });
 
-  // 4–5. RENDER + PRINT
-  const html = renderLeaseHtml(viewModel);
-  const pdf = await printPdf(html);
+  // 4–5. LAYOUT + WRITE PDF (directly; no browser runtime)
+  const pdf = renderLeasePdf(viewModel);
 
   // 6. STORE via the files pattern (purpose='generated-lease', private)
   const shortId = tenancy.id.slice(0, 8);

@@ -28,7 +28,7 @@ payloads until then).
 | 6 | Monthly Income + Overview | ✅ green | ✅ see below | Overview's "deadlines ≤30d" card reads 0 until the compliance table lands in Phase 7 (by design) |
 | 7 | Compliance + reminders data | ✅ green | ✅ see below | Overview "deadlines ≤30d" counts reminder rows (compliance **and** lease-expiry), since reminders are the deadline-as-data table |
 | 8 | Notification engine | ✅ green | ✅ see below | Email templates are typed HTML render functions behind `sendEmail()` (mock mode logs payloads — no Resend key in this environment); `GET /api/v1/reminders` added to power the inbox's "All upcoming deadlines" section (§4); `ALLOW_TEST_CLOCK=1` lets a production build honour `?today=` for local proofs |
-| 9 | Auto contract generation | ✅ green | ✅ see below | PDF printing uses the environment's pre-installed Playwright Chromium (`playwright-core` + resolved executable path); deploy targets can swap in `@sparticuz/chromium` per §8 Q11 without touching the pipeline |
+| 9 | Auto contract generation | ✅ green | ✅ see below | Lease PDFs are written directly in TypeScript with no HTML, Playwright, Chromium, or browser runtime dependency |
 
 ## Decisions
 
@@ -56,10 +56,9 @@ payloads until then).
   - **Real email:** set `RESEND_API_KEY` (+ `EMAIL_FROM`) in `.env` — until
     then `sendEmail()` runs in mock mode and logs each payload.
   - **Deployment (§8 Q11):** everything here runs locally. For Vercel +
-    Supabase cloud, point the env vars at the hosted project, schedule the
-    two cron routes (daily-scan 08:00 Europe/London + run-jobs sweep) and
-    swap Chromium for `@sparticuz/chromium` in
-    `src/lib/contract-generation/render.ts` (`resolveChromiumPath`).
+    Supabase cloud, point the env vars at the hosted project and schedule the
+    two cron routes (daily-scan 08:00 Europe/London + run-jobs sweep). The PDF
+    renderer has no external runtime dependency.
 - Note on seed state after the Phase 9 proof: the Quay Flat draft tenancy now
   carries the seeded uploaded lease as **superseded** plus a **generated**
   draft lease (and Maple has a generated renewal draft) — the four contract
@@ -356,15 +355,15 @@ GET /api/v1/reminders → 5 deadlines across properties sorted by due date ✓
 
 Migration: `db/migrations/0008_generated_documents.sql` (verbatim, completes
 the `contracts.generated_document_id` FK deferred from 0004). The spec's
-example template adopted verbatim into `templates/documents/lease/v1/template.html`
-(merge fields unchanged; template versions are directories — v2+ would sit
+example template wording is preserved by the versioned direct renderer
+(`templates/documents/lease/v1/` documents the implementation; v2+ would sit
 alongside). §5.4 pipeline as a background `contract.generate` job:
 view-model builder with all legal formatting (`formatDateLong`,
 `numberToWords`, `moneyLegal` → "one thousand two hundred and fifty pounds
 (£1,250.00)", `ordinal`, `termMonths`), a Zod schema for `lease/v1` that
-fails loudly on any missing/empty field, Handlebars render, headless
-Chromium print-to-PDF (A4 + the template's own @page margins,
-`preferCSSPageSize`), stored via the files pattern
+fails loudly on any missing/empty field, then writes a searchable A4 PDF
+directly with deterministic wrapping, pagination, standard fonts, and no
+browser process. The result is stored via the files pattern
 (`generated-lease/<uuid>/lease-<short-id>.pdf`, private, checksummed),
 `generated_documents` row with the exact `input_snapshot`, `contracts` draft
 row (`source='generated'`), then `notify(contract.generated)` (in-app only
@@ -394,7 +393,7 @@ notification "Lease generated for Priya Shah at Quay Flat" created;
 Renewal off the expiry flow: generate kind=renewal on the Maple active
   tenancy → renewal/generated/draft contract ✓
 Sample PDF downloaded via signed URL → artifacts/sample-lease.pdf
-  ("PDF document, version 1.4, 2 page(s)"; text layer shows the AST with
+  ("PDF document, version 1.4"; searchable text layer shows the AST with
   pets clause §4 and garden clause §5 present) ✓
 npm run test:golden → "PASS golden-lease: PDF text layer matches
   tests/golden/lease-v1.txt" ✓
