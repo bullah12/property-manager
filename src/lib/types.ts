@@ -208,7 +208,29 @@ export interface JobDto {
   lastError: string | null;
   createdAt: string;
   updatedAt: string;
+  context: JobContextDto | null;
 }
+
+export interface JobMissingFieldDto {
+  path: string;
+  label: string;
+}
+
+export interface ContractGenerationJobContextDto {
+  kind: "contract-generation";
+  contractKind: "lease" | "renewal";
+  tenancyId: string;
+  tenancyStatus: TenancyStatus | null;
+  tenantName: string | null;
+  propertyId: string | null;
+  propertyNickname: string | null;
+  missingFields: JobMissingFieldDto[];
+  linkPath: string | null;
+  editPath: string | null;
+  canEditTenancy: boolean;
+}
+
+export type JobContextDto = ContractGenerationJobContextDto;
 
 export interface UpcomingDeadlineDto extends ReminderDto {
   subject: {
