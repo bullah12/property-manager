@@ -9,7 +9,9 @@ import { buildContractGenerationJobContext } from "@/lib/job-context";
 import { serializeJob } from "@/lib/serializers";
 
 const listQuery = paginationQuery.extend({
-  status: z.enum(["pending", "running", "succeeded", "failed", "dead"]).optional(),
+  status: z
+    .enum(["pending", "running", "succeeded", "failed", "dead", "cancelled"])
+    .optional(),
 });
 
 /** Actionable queue visibility, including contract-generation prerequisites. */

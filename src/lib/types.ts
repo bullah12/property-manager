@@ -201,7 +201,7 @@ export interface NotificationDto {
 export interface JobDto {
   id: string;
   type: string;
-  status: "pending" | "running" | "succeeded" | "failed" | "dead";
+  status: "pending" | "running" | "succeeded" | "failed" | "dead" | "cancelled";
   runAt: string;
   attempts: number;
   maxAttempts: number;
