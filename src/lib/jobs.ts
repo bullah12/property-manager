@@ -1,5 +1,5 @@
 import type { Job, Prisma } from "@prisma/client";
-import { prisma } from "@/lib/db";
+import { prisma, requireWorkspaceId, runInWorkspace } from "@/lib/db";
 import { renderEmail, sendEmail } from "@/lib/email";
 import { removeFromStorage } from "@/lib/storage";
 
@@ -39,7 +39,9 @@ export async function enqueueJob(
   payload: Prisma.InputJsonValue,
   runAt: Date = new Date()
 ): Promise<Job> {
-  return prisma.job.create({ data: { type, payload, runAt } });
+  return prisma.job.create({
+    data: { workspaceId: requireWorkspaceId(), type, payload, runAt },
+  });
 }
 
 const BACKOFF_BASE_SECONDS = 30;
@@ -64,14 +66,15 @@ export async function runJobs(limit = 10): Promise<{ ran: number }> {
       )
       RETURNING id, type, payload, status, run_at AS "runAt", attempts,
                 max_attempts AS "maxAttempts", last_error AS "lastError",
-                created_at AS "createdAt", updated_at AS "updatedAt"
+                workspace_id AS "workspaceId", created_at AS "createdAt",
+                updated_at AS "updatedAt"
     `;
     if (claimed.length === 0 || ran >= limit) break;
     const job = claimed[0];
     const entry = handlers[job.type];
     try {
       if (!entry) throw new Error(`No handler for job type '${job.type}'`);
-      await entry.run(job);
+      await runInWorkspace(job.workspaceId, () => entry.run(job));
       await prisma.job.update({ where: { id: job.id }, data: { status: "succeeded" } });
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
@@ -81,7 +84,9 @@ export async function runJobs(limit = 10): Promise<{ ran: number }> {
           data: { status: "dead", lastError: message },
         });
         console.error(`[jobs] ${job.type} ${job.id} DEAD after ${job.attempts} attempts: ${message}`);
-        if (entry?.onDead) await entry.onDead(deadJob);
+        if (entry?.onDead) {
+          await runInWorkspace(deadJob.workspaceId, () => entry.onDead!(deadJob));
+        }
       } else {
         const backoffSeconds = BACKOFF_BASE_SECONDS * 2 ** (job.attempts - 1);
         await prisma.job.update({

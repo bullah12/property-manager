@@ -35,7 +35,8 @@ export async function middleware(request: NextRequest) {
   } = await supabase.auth.getUser();
 
   const isLoginPage = request.nextUrl.pathname === "/login";
-  if (!user && !isLoginPage) {
+  const isConfirmationRoute = request.nextUrl.pathname === "/auth/confirm";
+  if (!user && !isLoginPage && !isConfirmationRoute) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.search = "";
@@ -48,6 +49,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  response.headers.set("Cache-Control", "private, no-store, max-age=0");
   return response;
 }
 

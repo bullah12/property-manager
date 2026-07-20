@@ -1,8 +1,8 @@
 "use client";
 
 import { Building } from "lucide-react";
-import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
+import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
   Card,
@@ -13,31 +13,67 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { broadcastAuthChange } from "@/lib/auth-events";
 
 export default function LoginPage() {
-  const router = useRouter();
+  const queryClient = useQueryClient();
+  const [mode, setMode] = useState<"login" | "signup">("login");
+  const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
+  const [success, setSuccess] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (new URLSearchParams(window.location.search).get("confirmation") === "failed") {
+      setError("That confirmation link is invalid or has expired. Please sign up again.");
+    }
+  }, []);
+
+  function changeMode(nextMode: "login" | "signup") {
+    setMode(nextMode);
+    setError(null);
+    setSuccess(null);
+    setPassword("");
+    setConfirmPassword("");
+  }
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
+    if (mode === "signup" && password !== confirmPassword) {
+      setError("Passwords do not match");
+      return;
+    }
     setSubmitting(true);
     setError(null);
+    setSuccess(null);
     try {
-      const res = await fetch("/api/v1/auth/login", {
+      const res = await fetch(
+        mode === "signup" ? "/api/v1/auth/signup" : "/api/v1/auth/login",
+        {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
+          body: JSON.stringify(
+            mode === "signup" ? { displayName, email, password } : { email, password }
+          ),
+        }
+      );
       if (!res.ok) {
         const body = await res.json().catch(() => null);
-        setError(body?.error?.message ?? "Login failed");
+        setError(body?.error?.message ?? (mode === "signup" ? "Sign up failed" : "Login failed"));
         return;
       }
-      router.push("/");
-      router.refresh();
+      const body = await res.json();
+      if (mode === "signup" && body?.data?.needsEmailConfirmation) {
+        setSuccess("Account created. Check your email to confirm your address, then sign in.");
+        return;
+      }
+      await queryClient.cancelQueries();
+      queryClient.clear();
+      broadcastAuthChange();
+      window.location.replace("/");
     } finally {
       setSubmitting(false);
     }
@@ -51,10 +87,37 @@ export default function LoginPage() {
             <Building className="size-5" />
           </div>
           <CardTitle>Property Manager</CardTitle>
-          <CardDescription>Sign in to your dashboard</CardDescription>
+          <CardDescription>
+            {mode === "signup" ? "Create your private portfolio" : "Sign in to your dashboard"}
+          </CardDescription>
         </CardHeader>
         <CardContent>
+          {success ? (
+            <div className="space-y-4">
+              <p className="rounded-md border border-green-200 bg-green-50 p-3 text-sm text-green-800">
+                {success}
+              </p>
+              <Button type="button" className="w-full" onClick={() => changeMode("login")}>
+                Back to sign in
+              </Button>
+            </div>
+          ) : (
           <form onSubmit={onSubmit} className="space-y-4">
+            {mode === "signup" ? (
+              <div className="space-y-2">
+                <Label htmlFor="display-name">Your name</Label>
+                <Input
+                  id="display-name"
+                  type="text"
+                  autoComplete="name"
+                  minLength={2}
+                  maxLength={200}
+                  required
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                />
+              </div>
+            ) : null}
             <div className="space-y-2">
               <Label htmlFor="email">Email</Label>
               <Input
@@ -71,17 +134,51 @@ export default function LoginPage() {
               <Input
                 id="password"
                 type="password"
-                autoComplete="current-password"
+                autoComplete={mode === "signup" ? "new-password" : "current-password"}
+                minLength={mode === "signup" ? 8 : undefined}
+                maxLength={128}
                 required
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
+            {mode === "signup" ? (
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirm password</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  autoComplete="new-password"
+                  minLength={8}
+                  maxLength={128}
+                  required
+                  value={confirmPassword}
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </div>
+            ) : null}
             {error ? <p className="text-sm text-destructive">{error}</p> : null}
             <Button type="submit" className="w-full" disabled={submitting}>
-              {submitting ? "Signing in…" : "Sign in"}
+              {submitting
+                ? mode === "signup"
+                  ? "Creating account…"
+                  : "Signing in…"
+                : mode === "signup"
+                  ? "Create account"
+                  : "Sign in"}
             </Button>
+            <div className="text-center text-sm text-muted-foreground">
+              {mode === "signup" ? "Already have an account?" : "New to Property Manager?"}{" "}
+              <button
+                type="button"
+                className="font-medium text-foreground underline underline-offset-4"
+                onClick={() => changeMode(mode === "signup" ? "login" : "signup")}
+              >
+                {mode === "signup" ? "Sign in" : "Create an account"}
+              </button>
+            </div>
           </form>
+          )}
         </CardContent>
       </Card>
     </div>

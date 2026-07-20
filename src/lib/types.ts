@@ -23,6 +23,27 @@ export interface SettingsDto {
 export interface MeDto {
   user: UserDto;
   settings: SettingsDto;
+  workspace: WorkspaceDto;
+}
+
+export interface WorkspaceDto {
+  id: string;
+  name: string;
+  role: string;
+}
+
+export interface WorkspaceListDto {
+  activeWorkspaceId: string;
+  workspaces: WorkspaceDto[];
+}
+
+export interface WorkspaceMemberDto {
+  userId: string;
+  email: string;
+  displayName: string;
+  role: string;
+  status: string;
+  joinedAt?: string;
 }
 
 export interface ListMetaDto {
@@ -42,15 +63,110 @@ export interface PropertyDto {
   propertyType: "house" | "flat" | "hmo" | "commercial";
   bedrooms: number | null;
   purchasePriceCents: number | null;
-  landlordName: string | null;
-  landlordAddress: string | null;
-  landlordPhone: string | null;
-  landlordEmail: string | null;
+  ownershipMode: "sole" | "shared";
+  currentOwnershipEventId: string | null;
+  ownerships: PropertyOwnershipDto[];
+  mainLandlord: PropertyOwnershipDto | null;
   currency: string;
   notes: string | null;
   status: "active" | "archived";
   createdAt: string;
   updatedAt: string;
+}
+
+export interface PropertyOwnershipDto {
+  id: string;
+  eventId: string;
+  ownerId: string;
+  fullName: string;
+  address: string;
+  phone: string | null;
+  email: string | null;
+  ownershipPercentage: number;
+  isMainLandlord: boolean;
+  effectiveFrom: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface OwnershipPaymentDto {
+  id: string;
+  eventId: string | null;
+  kind: string;
+  payerOwnerId: string | null;
+  payerName: string | null;
+  recipientOwnerId: string | null;
+  recipientName: string | null;
+  amountDueCents: number;
+  amountPaidCents: number;
+  outstandingCents: number;
+  currency: string;
+  dueOn: string | null;
+  paidOn: string | null;
+  status: string;
+  paymentMethod: string | null;
+  reference: string | null;
+  throughPropertyFunds: boolean;
+  propertyFundDirection: string | null;
+  notes: string | null;
+  documentFileId: string | null;
+  transactionId: string | null;
+  createdAt: string;
+}
+
+export interface OwnershipEventDto {
+  id: string;
+  eventType: string;
+  transferType: string | null;
+  effectiveDate: string;
+  legalCompletionDate: string | null;
+  recordedAt: string;
+  recordedByName: string;
+  sellerOwnerId: string | null;
+  sellerName: string | null;
+  buyerOwnerId: string | null;
+  buyerName: string | null;
+  percentageTransferred: number | null;
+  agreedValueCents: number | null;
+  currency: string;
+  paymentTreatment: string | null;
+  beforeSnapshot: unknown;
+  afterSnapshot: unknown;
+  reason: string | null;
+  notes: string | null;
+  reversesEventId: string | null;
+  documentFileId: string | null;
+  allocations: PropertyOwnershipDto[];
+  payments: OwnershipPaymentDto[];
+  totalPaidCents: number;
+  outstandingCents: number;
+}
+
+export interface OwnershipNoteDto {
+  id: string;
+  ownerId: string | null;
+  ownerName: string | null;
+  eventId: string | null;
+  paymentId: string | null;
+  title: string;
+  noteText: string;
+  noteDate: string;
+  authorName: string;
+  sensitivity: string;
+  reviewOn: string | null;
+  documentFileId: string | null;
+  createdAt: string;
+}
+
+export interface OwnershipOverviewDto {
+  asOf: string;
+  currentEventId: string;
+  ownerships: PropertyOwnershipDto[];
+  ownershipTotal: number;
+  mainLandlord: PropertyOwnershipDto | null;
+  events: OwnershipEventDto[];
+  payments: OwnershipPaymentDto[];
+  notes: OwnershipNoteDto[];
 }
 
 export interface TenantDto {
@@ -192,6 +308,9 @@ export type ExpenseCategory =
   | "certificates"
   | "agent_fees"
   | "utilities"
+  | "capital_withdrawal"
+  | "distribution"
+  | "share_redemption"
   | "other";
 
 export interface TransactionDto {

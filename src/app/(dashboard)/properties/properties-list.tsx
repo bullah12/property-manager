@@ -38,7 +38,7 @@ const columns: ColumnDef<PropertyDto, unknown>[] = [
   },
   {
     header: "Landlord",
-    cell: ({ row }) => row.original.landlordName ?? "—",
+    cell: ({ row }) => row.original.mainLandlord?.fullName ?? "—",
   },
   {
     header: "Type",

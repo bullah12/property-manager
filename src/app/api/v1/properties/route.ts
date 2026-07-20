@@ -5,9 +5,10 @@ import { ok, okList, listMeta } from "@/lib/api/respond";
 import { parseSort } from "@/lib/api/sort";
 import { paginationQuery, parseBody, parseQuery } from "@/lib/api/validate";
 import { requireAdmin } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { prisma, requireWorkspaceId } from "@/lib/db";
 import { createPropertySchema, PROPERTY_TYPES } from "@/lib/schemas/property";
 import { serializeProperty } from "@/lib/serializers";
+import { createInitialOwnershipEvent, ownershipInclude } from "@/lib/property-ownership";
 
 const listQuery = paginationQuery.extend({
   status: z.enum(["active", "archived"]).optional(),
@@ -36,6 +37,7 @@ export const GET = apiHandler(async (req) => {
     prisma.property.count({ where }),
     prisma.property.findMany({
       where,
+      include: ownershipInclude,
       orderBy,
       skip: (q.page - 1) * q.perPage,
       take: q.perPage,
@@ -46,8 +48,15 @@ export const GET = apiHandler(async (req) => {
 });
 
 export const POST = apiHandler(async (req) => {
-  await requireAdmin();
+  const { user } = await requireAdmin();
   const body = await parseBody(req, createPropertySchema);
-  const property = await prisma.property.create({ data: body });
+  const { ownership, ...propertyData } = body;
+  const property = await prisma.$transaction(async (tx) => {
+    const created = await tx.property.create({
+      data: { ...propertyData, workspaceId: requireWorkspaceId() },
+    });
+    await createInitialOwnershipEvent(tx, created.id, ownership, user.id);
+    return tx.property.findUniqueOrThrow({ where: { id: created.id }, include: ownershipInclude });
+  });
   return ok(serializeProperty(property), 201);
 });

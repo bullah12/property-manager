@@ -6,11 +6,9 @@
  * exercise the requireAuth status check.
  */
 import { createHash } from "node:crypto";
-import { PrismaClient } from "@prisma/client";
 import { createClient } from "@supabase/supabase-js";
 import "dotenv/config";
-
-const prisma = new PrismaClient();
+import { prisma, requireWorkspaceId, runInWorkspace } from "../src/lib/db";
 
 const supabaseAdmin = createClient(
   requireEnv("NEXT_PUBLIC_SUPABASE_URL"),
@@ -68,6 +66,16 @@ async function seedUsers() {
     update: {},
     create: { userId: adminId },
   });
+  await prisma.workspace.upsert({
+    where: { id: adminId },
+    update: {},
+    create: { id: adminId, name: "Alex Landlord's portfolio" },
+  });
+  await prisma.workspaceMembership.upsert({
+    where: { workspaceId_userId: { workspaceId: adminId, userId: adminId } },
+    update: { role: "owner", status: "active" },
+    create: { workspaceId: adminId, userId: adminId, role: "owner" },
+  });
   console.log(`Seeded admin ${adminEmail} (${adminId})`);
 
   // Suspended user: valid Supabase session possible, but requireAuth rejects.
@@ -89,6 +97,16 @@ async function seedUsers() {
     where: { userId: suspendedId },
     update: {},
     create: { userId: suspendedId },
+  });
+  await prisma.workspace.upsert({
+    where: { id: suspendedId },
+    update: {},
+    create: { id: suspendedId, name: "Sam Suspended's portfolio" },
+  });
+  await prisma.workspaceMembership.upsert({
+    where: { workspaceId_userId: { workspaceId: suspendedId, userId: suspendedId } },
+    update: { role: "owner", status: "active" },
+    create: { workspaceId: suspendedId, userId: suspendedId, role: "owner" },
   });
   console.log(`Seeded suspended user ${suspendedEmail} (${suspendedId})`);
 
@@ -169,7 +187,55 @@ async function seedProperties() {
   ];
   for (const p of properties) {
     const { id, ...data } = p;
-    await prisma.property.upsert({ where: { id }, update: data, create: { id, ...data } });
+    await prisma.$transaction(async (tx) => {
+      await tx.property.upsert({
+        where: { id },
+        update: data,
+        create: { id, workspaceId: requireWorkspaceId(), ...data },
+      });
+      await tx.owner.upsert({
+        where: { id },
+        update: {
+          fullName: "Zulfiqar Ali Taj",
+          address: "25 Aiskew Grove, Stockton-on-Tees TS19 7QS, UK",
+          phone: "07847 617821",
+          email: "taj.zulfiqar@gmail.com",
+        },
+        create: {
+          id,
+          workspaceId: requireWorkspaceId(),
+          fullName: "Zulfiqar Ali Taj",
+          address: "25 Aiskew Grove, Stockton-on-Tees TS19 7QS, UK",
+          phone: "07847 617821",
+          email: "taj.zulfiqar@gmail.com",
+        },
+      });
+      await tx.ownershipEvent.upsert({
+        where: { id },
+        update: {},
+        create: {
+          id,
+          workspaceId: requireWorkspaceId(),
+          propertyId: id,
+          eventType: "initial",
+          effectiveDate: new Date("2020-01-01T00:00:00Z"),
+          beforeSnapshot: [],
+          afterSnapshot: [{ ownerId: id, ownershipPercentage: 100, isMainLandlord: true }],
+          reason: "Seed opening ownership",
+        },
+      });
+      await tx.ownershipEventAllocation.upsert({
+        where: { eventId_ownerId: { eventId: id, ownerId: id } },
+        update: {},
+        create: {
+          workspaceId: requireWorkspaceId(),
+          eventId: id,
+          ownerId: id,
+          ownershipPercentage: 100,
+          isMainLandlord: true,
+        },
+      });
+    });
   }
   console.log(`Seeded ${properties.length} properties`);
 }
@@ -207,7 +273,11 @@ async function seedTenantsAndTenancies() {
   ];
   for (const t of tenants) {
     const { id, ...data } = t;
-    await prisma.tenant.upsert({ where: { id }, update: data, create: { id, ...data } });
+    await prisma.tenant.upsert({
+      where: { id },
+      update: data,
+      create: { id, workspaceId: requireWorkspaceId(), ...data },
+    });
   }
 
   // Tenancies covering all four states (PLAN.md §3 seed spec):
@@ -288,7 +358,11 @@ async function seedTenantsAndTenancies() {
   ];
   for (const t of tenancies) {
     const { id, ...data } = t;
-    await prisma.tenancy.upsert({ where: { id }, update: data, create: { id, ...data } });
+    await prisma.tenancy.upsert({
+      where: { id },
+      update: data,
+      create: { id, workspaceId: requireWorkspaceId(), ...data },
+    });
   }
   console.log(`Seeded ${tenants.length} tenants, ${tenancies.length} tenancies`);
 }
@@ -354,6 +428,7 @@ async function seedFileAndContract(opts: {
     update: { status: "ready" },
     create: {
       id: opts.fileId,
+      workspaceId: requireWorkspaceId(),
       ownerId: opts.ownerId,
       purpose: "lease-doc",
       storageKey,
@@ -369,6 +444,7 @@ async function seedFileAndContract(opts: {
     update: { status: opts.status },
     create: {
       id: opts.contractId,
+      workspaceId: requireWorkspaceId(),
       tenancyId: opts.tenancyId,
       kind: opts.kind,
       source: "uploaded",
@@ -439,6 +515,7 @@ async function seedExpenses(adminId: string) {
     update: { status: "ready" },
     create: {
       id: SEED_IDS.fileReceiptBoiler,
+      workspaceId: requireWorkspaceId(),
       ownerId: adminId,
       purpose: "receipt",
       storageKey: receiptKey,
@@ -490,6 +567,7 @@ async function seedExpenses(adminId: string) {
       update: {},
       create: {
         id,
+        workspaceId: requireWorkspaceId(),
         propertyId,
         direction: "expense",
         category,
@@ -578,6 +656,7 @@ async function seedRentPayments() {
       update: {},
       create: {
         id,
+        workspaceId: requireWorkspaceId(),
         ...data,
         direction: "income",
         category: "rent",
@@ -602,6 +681,7 @@ async function seedComplianceAndReminders(adminId: string) {
     update: { status: "ready" },
     create: {
       id: SEED_IDS.fileGasCert,
+      workspaceId: requireWorkspaceId(),
       ownerId: adminId,
       purpose: "certificate",
       storageKey: certKey,
@@ -667,6 +747,7 @@ async function seedComplianceAndReminders(adminId: string) {
       },
       create: {
         id,
+        workspaceId: requireWorkspaceId(),
         ...data,
         dueOn: new Date(`${dueOn}T00:00:00Z`),
         completedOn: completedOn ? new Date(`${completedOn}T00:00:00Z`) : null,
@@ -688,6 +769,7 @@ async function seedComplianceAndReminders(adminId: string) {
       where: { subjectType_subjectId: { subjectType, subjectId } },
       update: { dueOn: new Date(`${dueOn}T00:00:00Z`) },
       create: {
+        workspaceId: requireWorkspaceId(),
         subjectType,
         subjectId,
         dueOn: new Date(`${dueOn}T00:00:00Z`),
@@ -746,7 +828,7 @@ async function seedNotificationsAndJobs(adminId: string) {
     await prisma.notification.upsert({
       where: { id },
       update: {},
-      create: { id, userId: adminId, ...data },
+      create: { id, workspaceId: requireWorkspaceId(), userId: adminId, ...data },
     });
   }
 
@@ -755,6 +837,7 @@ async function seedNotificationsAndJobs(adminId: string) {
     update: {},
     create: {
       id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaa01",
+      workspaceId: requireWorkspaceId(),
       type: "email.send",
       payload: { notificationId: "99999999-9999-4999-8999-999999999901" },
       status: "dead",
@@ -768,13 +851,15 @@ async function seedNotificationsAndJobs(adminId: string) {
 
 async function main() {
   const { adminId } = await seedUsers();
-  await seedProperties();
-  await seedTenantsAndTenancies();
-  await seedContracts(adminId);
-  await seedExpenses(adminId);
-  await seedRentPayments();
-  await seedComplianceAndReminders(adminId);
-  await seedNotificationsAndJobs(adminId);
+  await runInWorkspace(adminId, async () => {
+    await seedProperties();
+    await seedTenantsAndTenancies();
+    await seedContracts(adminId);
+    await seedExpenses(adminId);
+    await seedRentPayments();
+    await seedComplianceAndReminders(adminId);
+    await seedNotificationsAndJobs(adminId);
+  });
   console.log("Seed complete.");
 }
 

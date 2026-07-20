@@ -16,6 +16,7 @@ import { buildLeaseViewModel } from "../src/lib/contract-generation/view-model";
 import "dotenv/config";
 
 const GOLDEN_PATH = path.join(process.cwd(), "tests", "golden", "lease-v2.txt");
+const WORKSPACE_ID = "00000000-0000-4000-8000-000000000009";
 
 /** Fixture view model — proves the supplied property landlord drives the document. */
 const fixture = buildLeaseViewModel({
@@ -27,6 +28,7 @@ const fixture = buildLeaseViewModel({
   },
   tenant: {
     id: "00000000-0000-0000-0000-000000000002",
+    workspaceId: WORKSPACE_ID,
     fullName: "Noreen Akhtar",
     phone: "07933 651414",
     email: null,
@@ -36,6 +38,7 @@ const fixture = buildLeaseViewModel({
   },
   property: {
     id: "00000000-0000-0000-0000-000000000001",
+    workspaceId: WORKSPACE_ID,
     nickname: "Alum Rock Road",
     addressLine1: "322 Alum Rock Rd",
     addressLine2: "Alum Rock",
@@ -44,10 +47,6 @@ const fixture = buildLeaseViewModel({
     propertyType: "house",
     bedrooms: 3,
     purchasePriceCents: null,
-    landlordName: "Zulfiqar Ali Taj",
-    landlordAddress: "25 Aiskew Grove, Stockton-on-Tees TS19 7QS, UK",
-    landlordPhone: "07847 617821",
-    landlordEmail: "taj.zulfiqar@gmail.com",
     notes: null,
     status: "active",
     createdAt: new Date("2026-01-01T00:00:00Z"),
@@ -55,6 +54,7 @@ const fixture = buildLeaseViewModel({
   },
   tenancy: {
     id: "00000000-0000-0000-0000-000000000003",
+    workspaceId: WORKSPACE_ID,
     propertyId: "00000000-0000-0000-0000-000000000001",
     tenantId: "00000000-0000-0000-0000-000000000002",
     startDate: new Date("2026-07-01T00:00:00Z"),

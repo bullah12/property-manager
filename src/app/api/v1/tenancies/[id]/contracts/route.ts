@@ -4,7 +4,7 @@ import { apiHandler } from "@/lib/api/handler";
 import { ok, okList, listMeta } from "@/lib/api/respond";
 import { parse, parseBody } from "@/lib/api/validate";
 import { requireAdmin } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { prisma, requireWorkspaceId } from "@/lib/db";
 import { parseDateOnly } from "@/lib/dates";
 import { dateOnly } from "@/lib/schemas/tenancy";
 import { serializeContract } from "@/lib/serializers";
@@ -56,6 +56,7 @@ export const POST = apiHandler<{ id: string }>(async (req, { params }) => {
 
   const contract = await prisma.contract.create({
     data: {
+      workspaceId: requireWorkspaceId(),
       tenancyId: id,
       kind: body.kind,
       source: "uploaded",

@@ -58,8 +58,11 @@ const NotificationsTab = dynamic<{ propertyId: string; propertyNickname?: string
   () => import("./tabs/notifications-tab").then((module) => module.NotificationsTab),
   { loading: TabLoadingSkeleton }
 );
+const OwnershipTab = dynamic<{ propertyId: string }>(() => import("./tabs/ownership-tab").then((module) => module.OwnershipTab), {
+  loading: TabLoadingSkeleton,
+});
 
-const TABS = ["contracts", "income", "expenses", "notifications", "tenancy"] as const;
+const TABS = ["ownership", "contracts", "income", "expenses", "notifications", "tenancy"] as const;
 type TabKey = (typeof TABS)[number];
 
 export function PropertyDetail({ id }: { id: string }) {
@@ -111,9 +114,9 @@ export function PropertyDetail({ id }: { id: string }) {
             {property.bedrooms != null ? ` · ${property.bedrooms} bed` : ""}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Landlord: {property.landlordName ?? "Not set"}
-            {property.landlordEmail ? ` · ${property.landlordEmail}` : ""}
-            {property.landlordPhone ? ` · ${property.landlordPhone}` : ""}
+            Main landlord: {property.mainLandlord?.fullName ?? "Not set"}
+            {property.mainLandlord?.email ? ` · ${property.mainLandlord.email}` : ""}
+            {property.mainLandlord?.phone ? ` · ${property.mainLandlord.phone}` : ""}
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -213,6 +216,7 @@ export function PropertyDetail({ id }: { id: string }) {
       >
         <TabsList className="flex-wrap">
           <TabsTrigger value="tenancy">Tenancy</TabsTrigger>
+          <TabsTrigger value="ownership">Ownership</TabsTrigger>
           <TabsTrigger value="contracts">Contracts</TabsTrigger>
           <TabsTrigger value="income">Monthly Income</TabsTrigger>
           <TabsTrigger value="expenses">Expenses</TabsTrigger>
@@ -220,6 +224,13 @@ export function PropertyDetail({ id }: { id: string }) {
         </TabsList>
         <TabsContent value="tenancy">
           <TenancyTab propertyId={id} />
+        </TabsContent>
+        <TabsContent value="ownership">
+          {property ? (
+            <OwnershipTab
+              propertyId={id}
+            />
+          ) : null}
         </TabsContent>
         <TabsContent value="contracts">
           <ContractsTab propertyId={id} />

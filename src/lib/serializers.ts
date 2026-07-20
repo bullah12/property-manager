@@ -6,6 +6,11 @@ import type {
   File,
   Job,
   Notification,
+  OwnershipEvent,
+  OwnershipEventAllocation,
+  OwnershipNote,
+  OwnershipPayment,
+  Owner,
   Property,
   Reminder,
   Tenancy,
@@ -33,7 +38,35 @@ export function serializeUser(user: User) {
   };
 }
 
-export function serializeProperty(p: Property) {
+type Allocation = OwnershipEventAllocation & { owner: Owner };
+type EventWithAllocations = OwnershipEvent & { allocations: Allocation[] };
+type PropertyWithOwnerships = Property & {
+  ownershipEvents: EventWithAllocations[];
+};
+
+export function serializePropertyOwnership(row: Allocation, event: OwnershipEvent) {
+  return {
+    id: `${event.id}:${row.ownerId}`,
+    eventId: event.id,
+    ownerId: row.ownerId,
+    fullName: row.owner.fullName,
+    address: row.owner.address,
+    phone: row.owner.phone,
+    email: row.owner.email,
+    ownershipPercentage: Number(row.ownershipPercentage),
+    isMainLandlord: row.isMainLandlord,
+    effectiveFrom: toDateOnly(event.effectiveDate),
+    createdAt: event.recordedAt.toISOString(),
+    updatedAt: event.recordedAt.toISOString(),
+  };
+}
+
+export function serializeProperty(p: PropertyWithOwnerships) {
+  const currentEvent = p.ownershipEvents[0] ?? null;
+  const ownerships = currentEvent
+    ? currentEvent.allocations.map((row) => serializePropertyOwnership(row, currentEvent))
+    : [];
+  const mainLandlord = ownerships.find((owner) => owner.isMainLandlord) ?? null;
   return {
     id: p.id,
     nickname: p.nickname,
@@ -44,15 +77,112 @@ export function serializeProperty(p: Property) {
     propertyType: p.propertyType,
     bedrooms: p.bedrooms,
     purchasePriceCents: p.purchasePriceCents,
-    landlordName: p.landlordName,
-    landlordAddress: p.landlordAddress,
-    landlordPhone: p.landlordPhone,
-    landlordEmail: p.landlordEmail,
+    ownershipMode: ownerships.length === 1 ? "sole" : "shared",
+    currentOwnershipEventId: currentEvent?.id ?? null,
+    ownerships,
+    mainLandlord,
     currency: CURRENCY,
     notes: p.notes,
     status: p.status,
     createdAt: p.createdAt.toISOString(),
     updatedAt: p.updatedAt.toISOString(),
+  };
+}
+
+type PaymentWithParties = OwnershipPayment & {
+  payer?: Owner | null;
+  recipient?: Owner | null;
+  documentFile?: File | null;
+};
+
+export function serializeOwnershipPayment(payment: PaymentWithParties) {
+  const today = new Date().toISOString().slice(0, 10);
+  const dueOn = payment.dueOn ? toDateOnly(payment.dueOn) : null;
+  const status = payment.status !== "paid" && payment.status !== "cancelled" && dueOn && dueOn < today
+    ? "overdue"
+    : payment.status;
+  return {
+    id: payment.id,
+    eventId: payment.eventId,
+    kind: payment.kind,
+    payerOwnerId: payment.payerOwnerId,
+    payerName: payment.payer?.fullName ?? null,
+    recipientOwnerId: payment.recipientOwnerId,
+    recipientName: payment.recipient?.fullName ?? null,
+    amountDueCents: Number(payment.amountDueCents),
+    amountPaidCents: Number(payment.amountPaidCents),
+    outstandingCents: Number(payment.amountDueCents - payment.amountPaidCents),
+    currency: payment.currency,
+    dueOn,
+    paidOn: payment.paidOn ? toDateOnly(payment.paidOn) : null,
+    status,
+    paymentMethod: payment.paymentMethod,
+    reference: payment.reference,
+    throughPropertyFunds: payment.throughPropertyFunds,
+    propertyFundDirection: payment.propertyFundDirection,
+    notes: payment.notes,
+    documentFileId: payment.documentFileId,
+    transactionId: payment.transactionId,
+    createdAt: payment.createdAt.toISOString(),
+  };
+}
+
+export function serializeOwnershipEvent(
+  event: OwnershipEvent & {
+    allocations: Allocation[];
+    seller?: Owner | null;
+    buyer?: Owner | null;
+    recordedBy?: User | null;
+    payments?: PaymentWithParties[];
+  }
+) {
+  const payments = (event.payments ?? []).map(serializeOwnershipPayment);
+  return {
+    id: event.id,
+    eventType: event.eventType,
+    transferType: event.transferType,
+    effectiveDate: toDateOnly(event.effectiveDate),
+    legalCompletionDate: event.legalCompletionDate ? toDateOnly(event.legalCompletionDate) : null,
+    recordedAt: event.recordedAt.toISOString(),
+    recordedByName: event.recordedBy?.displayName ?? "System migration",
+    sellerOwnerId: event.sellerOwnerId,
+    sellerName: event.seller?.fullName ?? null,
+    buyerOwnerId: event.buyerOwnerId,
+    buyerName: event.buyer?.fullName ?? null,
+    percentageTransferred: event.percentageTransferred == null ? null : Number(event.percentageTransferred),
+    agreedValueCents: event.agreedValueCents == null ? null : Number(event.agreedValueCents),
+    currency: event.currency,
+    paymentTreatment: event.paymentTreatment,
+    beforeSnapshot: event.beforeSnapshot,
+    afterSnapshot: event.afterSnapshot,
+    reason: event.reason,
+    notes: event.notes,
+    reversesEventId: event.reversesEventId,
+    documentFileId: event.documentFileId,
+    allocations: event.allocations.map((row) => serializePropertyOwnership(row, event)),
+    payments,
+    totalPaidCents: payments.reduce((sum, payment) => sum + payment.amountPaidCents, 0),
+    outstandingCents: event.agreedValueCents != null
+      ? Math.max(0, Number(event.agreedValueCents) - payments.reduce((sum, payment) => sum + payment.amountPaidCents, 0))
+      : payments.reduce((sum, payment) => sum + Math.max(0, payment.outstandingCents), 0),
+  };
+}
+
+export function serializeOwnershipNote(note: OwnershipNote & { owner?: Owner | null; author?: User | null }) {
+  return {
+    id: note.id,
+    ownerId: note.ownerId,
+    ownerName: note.owner?.fullName ?? null,
+    eventId: note.eventId,
+    paymentId: note.paymentId,
+    title: note.title,
+    noteText: note.noteText,
+    noteDate: toDateOnly(note.noteDate),
+    authorName: note.author?.displayName ?? "System",
+    sensitivity: note.sensitivity,
+    reviewOn: note.reviewOn ? toDateOnly(note.reviewOn) : null,
+    documentFileId: note.documentFileId,
+    createdAt: note.createdAt.toISOString(),
   };
 }
 

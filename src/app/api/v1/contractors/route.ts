@@ -6,7 +6,7 @@ import { parseSort } from "@/lib/api/sort";
 import { paginationQuery, parseBody, parseQuery } from "@/lib/api/validate";
 import { requireAdmin } from "@/lib/auth";
 import { CONTRACTOR_TRADE_VALUES } from "@/lib/contractors";
-import { prisma } from "@/lib/db";
+import { prisma, requireWorkspaceId } from "@/lib/db";
 import { createContractorSchema } from "@/lib/schemas/contractor";
 import { serializeContractor } from "@/lib/serializers";
 
@@ -80,6 +80,8 @@ export const GET = apiHandler(async (req) => {
 export const POST = apiHandler(async (req) => {
   await requireAdmin();
   const body = await parseBody(req, createContractorSchema);
-  const contractor = await prisma.contractor.create({ data: body });
+  const contractor = await prisma.contractor.create({
+    data: { ...body, workspaceId: requireWorkspaceId() },
+  });
   return ok(serializeContractor(contractor), 201);
 });

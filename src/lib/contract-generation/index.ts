@@ -1,9 +1,10 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Job, Prisma } from "@prisma/client";
 import { conflict, notFound } from "@/lib/api/errors";
-import { prisma } from "@/lib/db";
+import { prisma, requireWorkspaceId } from "@/lib/db";
 import { enqueueJob, registerJobHandler } from "@/lib/jobs";
 import { getOwner, notify } from "@/lib/notify";
+import { findMainLandlord } from "@/lib/property-ownership";
 import { uploadToStorage } from "@/lib/storage";
 import { buildGeneratedLeaseFilename } from "./filename";
 import { renderLeasePdf } from "./render";
@@ -52,17 +53,31 @@ async function handleContractGenerate(job: Job) {
   const actor = requestedBy ?? (await getOwner());
   const tenancy = await prisma.tenancy.findUnique({
     where: { id: payload.tenancyId },
-    include: { property: true, tenant: true },
+    include: {
+      property: {
+        include: {
+          ownershipEvents: {
+            orderBy: [{ effectiveDate: "desc" }, { recordedAt: "desc" }],
+            include: { allocations: { include: { owner: true } } },
+          },
+        },
+      },
+      tenant: true,
+    },
   });
   if (!tenancy) throw new Error("contract.generate: tenancy not found");
+  const applicableOwnership = tenancy.property.ownershipEvents.find(
+    (event) => event.effectiveDate <= job.createdAt
+  ) ?? tenancy.property.ownershipEvents[0];
+  const mainLandlord = findMainLandlord(applicableOwnership?.allocations ?? []);
 
   // 2–3. BUILD + VALIDATE (fails loudly on any missing field)
   const viewModel = buildLeaseViewModel({
     landlord: {
-      fullName: tenancy.property.landlordName ?? "",
-      address: tenancy.property.landlordAddress ?? "",
-      phone: tenancy.property.landlordPhone,
-      email: tenancy.property.landlordEmail,
+      fullName: mainLandlord?.fullName ?? "",
+      address: mainLandlord?.address ?? "",
+      phone: mainLandlord?.phone ?? null,
+      email: mainLandlord?.email ?? null,
     },
     property: tenancy.property,
     tenancy,
@@ -79,6 +94,7 @@ async function handleContractGenerate(job: Job) {
   await uploadToStorage(storageKey, pdf, "application/pdf");
   const file = await prisma.file.create({
     data: {
+      workspaceId: requireWorkspaceId(),
       ownerId: actor.id,
       purpose: "generated-lease",
       storageKey,
@@ -94,6 +110,7 @@ async function handleContractGenerate(job: Job) {
   await prisma.$transaction(async (tx) => {
     const doc = await tx.generatedDocument.create({
       data: {
+        workspaceId: requireWorkspaceId(),
         docType: "lease",
         templateVersion: TEMPLATE_VERSION,
         subjectType: "tenancy",
@@ -104,6 +121,7 @@ async function handleContractGenerate(job: Job) {
     });
     await tx.contract.create({
       data: {
+        workspaceId: requireWorkspaceId(),
         tenancyId: tenancy.id,
         kind: payload.kind,
         source: "generated",

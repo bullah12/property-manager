@@ -1,5 +1,5 @@
-import type { ComplianceItem, Prisma, Tenancy } from "@prisma/client";
-import { prisma } from "@/lib/db";
+import type { ComplianceItem, Tenancy } from "@prisma/client";
+import { currentWorkspaceId, prisma, requireWorkspaceId } from "@/lib/db";
 import { toDateOnly } from "@/lib/dates";
 
 /**
@@ -8,13 +8,21 @@ import { toDateOnly } from "@/lib/dates";
  * FK, so these helpers are the only writers.
  */
 
-type Db = Prisma.TransactionClient | typeof prisma;
+type Db = Pick<typeof prisma, "reminder" | "workspaceMembership">;
 
 async function defaultLeadDays(db: Db): Promise<number[]> {
-  const settings = await db.userSettings.findFirst({
-    where: { user: { role: "admin", status: "active" } },
+  const workspaceId = currentWorkspaceId();
+  if (!workspaceId) throw new Error("Reminder writes require a workspace context");
+  const membership = await db.workspaceMembership.findFirst({
+    where: {
+      workspaceId,
+      status: "active",
+      role: { in: ["owner", "admin"] },
+      user: { status: "active" },
+    },
+    include: { user: { include: { settings: true } } },
   });
-  return settings?.defaultLeadDays ?? [60, 30, 7];
+  return membership?.user.settings?.defaultLeadDays ?? [60, 30, 7];
 }
 
 async function upsertReminder(
@@ -29,6 +37,7 @@ async function upsertReminder(
   if (!existing) {
     await db.reminder.create({
       data: {
+        workspaceId: requireWorkspaceId(),
         subjectType,
         subjectId,
         dueOn,

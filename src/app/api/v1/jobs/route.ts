@@ -39,7 +39,17 @@ export const GET = apiHandler(async (req) => {
   const tenancies = contractPayloads.length
     ? await prisma.tenancy.findMany({
         where: { id: { in: [...new Set(contractPayloads.map((p) => p.tenancyId))] } },
-        include: { property: true, tenant: true },
+        include: {
+          property: {
+            include: {
+              ownershipEvents: {
+                orderBy: [{ effectiveDate: "desc" }, { recordedAt: "desc" }],
+                include: { allocations: { include: { owner: true } } },
+              },
+            },
+          },
+          tenant: true,
+        },
       })
     : [];
   const tenancyById = new Map(tenancies.map((tenancy) => [tenancy.id, tenancy]));
