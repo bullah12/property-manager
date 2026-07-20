@@ -32,7 +32,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PanelLoading } from "@/components/panel-loading";
 import {
   Table,
   TableBody,
@@ -110,7 +110,7 @@ export function ContractsTab({ propertyId }: { propertyId: string }) {
       toast.error(err instanceof ApiClientError ? err.message : "Action failed"),
   });
 
-  if (query.isLoading) return <Skeleton className="h-64 w-full" />;
+  if (query.isLoading) return <PanelLoading label="Loading contracts…" />;
   if (query.isError) {
     return (
       <div className="text-sm text-muted-foreground">

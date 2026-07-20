@@ -35,7 +35,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PanelLoading } from "@/components/panel-loading";
 import {
   Table,
   TableBody,
@@ -193,7 +193,7 @@ export function ExpensesTab({ propertyId }: { propertyId: string }) {
       <div className="grid gap-4 lg:grid-cols-3">
         <div className="lg:col-span-2">
           {query.isLoading ? (
-            <Skeleton className="h-64 w-full" />
+            <PanelLoading label="Loading expenses…" />
           ) : query.isError ? (
             <div className="text-sm text-muted-foreground">
               Failed to load expenses.{" "}

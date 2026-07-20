@@ -8,6 +8,7 @@ import { usePathname, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { DateDisplay } from "@/components/date-display";
 import { Money } from "@/components/money";
+import { PanelLoading } from "@/components/panel-loading";
 import { StatusBadge } from "@/components/status-badge";
 import {
   AlertDialog,
@@ -34,7 +35,7 @@ import { api, ApiClientError } from "@/lib/api-client";
 import type { PropertyDetailDto } from "@/lib/types";
 
 function TabLoadingSkeleton() {
-  return <Skeleton className="h-64 w-full" />;
+  return <PanelLoading label="Loading tab…" />;
 }
 
 const TenancyTab = dynamic<{ propertyId: string }>(

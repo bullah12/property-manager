@@ -30,7 +30,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PanelLoading } from "@/components/panel-loading";
 import { Textarea } from "@/components/ui/textarea";
 import { api, ApiClientError } from "@/lib/api-client";
 import { toDateOnly } from "@/lib/dates";
@@ -131,7 +131,7 @@ export function IncomeTab({ propertyId }: { propertyId: string }) {
       </div>
 
       {query.isLoading ? (
-        <Skeleton className="h-80 w-full" />
+        <PanelLoading className="min-h-80" label="Loading monthly income…" />
       ) : query.isError || !grid ? (
         <div className="text-sm text-muted-foreground">
           Failed to load income data.{" "}

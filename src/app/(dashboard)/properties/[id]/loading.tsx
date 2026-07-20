@@ -1,4 +1,5 @@
 import { Skeleton } from "@/components/ui/skeleton";
+import { PanelLoading } from "@/components/panel-loading";
 
 export default function PropertyLoading() {
   return (
@@ -28,7 +29,7 @@ export default function PropertyLoading() {
             )
           )}
         </div>
-        <Skeleton className="h-64 w-full" />
+        <PanelLoading label="Loading contracts…" />
       </div>
     </div>
   );

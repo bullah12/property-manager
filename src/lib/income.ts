@@ -249,6 +249,28 @@ export async function findOverdueRentPeriods(today: string, graceDays: number) {
     include: { tenant: true, property: true },
   });
 
+  const rentTotals =
+    tenancies.length === 0
+      ? []
+      : await prisma.transaction.groupBy({
+          by: ["tenancyId", "rentPeriod"],
+          where: {
+            tenancyId: { in: tenancies.map((tenancy) => tenancy.id) },
+            direction: "income",
+            category: "rent",
+            rentPeriod: { in: [previousPeriod, currentPeriod] },
+          },
+          _sum: { amountCents: true },
+        });
+  const receivedByTenancyPeriod = new Map(
+    rentTotals
+      .filter((total) => total.tenancyId && total.rentPeriod)
+      .map((total) => [
+        `${total.tenancyId}:${toDateOnly(total.rentPeriod!)}`,
+        total._sum.amountCents ?? 0,
+      ])
+  );
+
   const results: Array<{
     tenancy: (typeof tenancies)[number];
     period: string;
@@ -265,16 +287,8 @@ export async function findOverdueRentPeriods(today: string, graceDays: number) {
       const periods = deriveRentPeriods(t, year);
       const period = periods.find((p) => p.period === toDateOnly(periodDate));
       if (!period) continue;
-      const received = await prisma.transaction.aggregate({
-        _sum: { amountCents: true },
-        where: {
-          tenancyId: t.id,
-          direction: "income",
-          category: "rent",
-          rentPeriod: periodDate,
-        },
-      });
-      const receivedCents = received._sum.amountCents ?? 0;
+      const receivedCents =
+        receivedByTenancyPeriod.get(`${t.id}:${period.period}`) ?? 0;
       const status = monthStatus({
         receivedCents,
         expectedCents: period.expectedCents,

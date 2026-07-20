@@ -44,7 +44,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PanelLoading } from "@/components/panel-loading";
 import {
   Table,
   TableBody,
@@ -139,7 +139,7 @@ export function NotificationsTab({
     }
   };
 
-  if (query.isLoading) return <Skeleton className="h-64 w-full" />;
+  if (query.isLoading) return <PanelLoading label="Loading compliance…" />;
   if (query.isError || !query.data) {
     return (
       <div className="text-sm text-muted-foreground">

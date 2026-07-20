@@ -27,7 +27,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Skeleton } from "@/components/ui/skeleton";
+import { PanelLoading } from "@/components/panel-loading";
 import {
   Table,
   TableBody,
@@ -87,7 +87,7 @@ export function TenancyTab({ propertyId }: { propertyId: string }) {
     },
   });
 
-  if (query.isLoading) return <Skeleton className="h-64 w-full" />;
+  if (query.isLoading) return <PanelLoading label="Loading tenancy…" />;
   if (query.isError) {
     return (
       <div className="text-sm text-muted-foreground">
