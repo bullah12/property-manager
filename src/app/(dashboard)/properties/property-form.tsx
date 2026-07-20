@@ -55,6 +55,7 @@ const formSchema = z.object({
     .string()
     .regex(/^(\d+(\.\d{1,2})?)?$/, "Amount in pounds, e.g. 250000 or 250000.00"),
   ownershipMode: z.enum(["sole", "shared"]),
+  ownershipEffectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Required"),
   owners: z.array(ownerFormSchema).min(1),
   notes: z.string().max(10_000),
 }).superRefine((value, ctx) => {
@@ -98,6 +99,8 @@ export function PropertyForm({ property }: { property?: PropertyDto }) {
           ? (property.purchasePriceCents / 100).toFixed(2)
           : "",
       ownershipMode: property?.ownershipMode ?? "sole",
+      ownershipEffectiveFrom:
+        property?.ownerships[0]?.effectiveFrom ?? new Date().toISOString().slice(0, 10),
       owners: property?.ownerships.length
         ? property.ownerships.map((owner) => ({
             ownerId: owner.ownerId,
@@ -139,19 +142,23 @@ export function PropertyForm({ property }: { property?: PropertyDto }) {
           values.purchasePrice === ""
             ? null
             : Math.round(parseFloat(values.purchasePrice) * 100),
-        ownership: {
-          mode: values.ownershipMode,
-          owners: values.owners.map((owner) => ({
-            ...(owner.ownerId ? { ownerId: owner.ownerId } : {}),
-            fullName: owner.fullName,
-            address: owner.address,
-            phone: owner.phone || null,
-            email: owner.email || null,
-            ownershipPercentage:
-              values.ownershipMode === "sole" ? 100 : Number(owner.ownershipPercentage),
-            isMainLandlord: owner.isMainLandlord,
-          })),
-        },
+        ...(!isEdit
+          ? {
+              ownership: {
+                mode: values.ownershipMode,
+                effectiveFrom: values.ownershipEffectiveFrom,
+                owners: values.owners.map((owner) => ({
+                  fullName: owner.fullName,
+                  address: owner.address,
+                  phone: owner.phone || null,
+                  email: owner.email || null,
+                  ownershipPercentage:
+                    values.ownershipMode === "sole" ? 100 : Number(owner.ownershipPercentage),
+                  isMainLandlord: owner.isMainLandlord,
+                })),
+              },
+            }
+          : {}),
         notes: values.notes || null,
       };
       if (isEdit) {
@@ -302,6 +309,7 @@ export function PropertyForm({ property }: { property?: PropertyDto }) {
                 )}
               />
             </div>
+            {!isEdit ? (
             <div id="ownership" className="space-y-4 rounded-lg border p-4">
               <div>
                 <h3 className="font-medium">Property ownership</h3>
@@ -336,6 +344,18 @@ export function PropertyForm({ property }: { property?: PropertyDto }) {
                         <TabsTrigger value="shared">Shared ownership</TabsTrigger>
                       </TabsList>
                     </Tabs>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="ownershipEffectiveFrom"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Ownership effective from</FormLabel>
+                    <FormControl><Input type="date" {...field} /></FormControl>
+                    <FormDescription>The legal or economic date of the opening allocation.</FormDescription>
                     <FormMessage />
                   </FormItem>
                 )}
@@ -419,6 +439,7 @@ export function PropertyForm({ property }: { property?: PropertyDto }) {
                 </Button>
               ) : null}
             </div>
+            ) : null}
             <FormField
               control={form.control}
               name="notes"

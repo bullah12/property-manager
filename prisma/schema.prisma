@@ -14,25 +14,28 @@ datasource db {
 // ---- 0004_files_and_contracts ----
 
 model File {
-  id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  workspaceId        String              @map("workspace_id") @db.Uuid
-  ownerId            String?             @map("owner_id") @db.Uuid
-  purpose            String
-  storageKey         String              @unique @map("storage_key")
-  contentType        String              @map("content_type")
-  sizeBytes          BigInt              @map("size_bytes")
-  checksumSha256     String?             @map("checksum_sha256")
-  isPublic           Boolean             @default(false) @map("is_public")
-  status             String              @default("pending")
-  variants           Json                @default("{}")
-  createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  owner              User?               @relation(fields: [ownerId], references: [id], onDelete: SetNull)
-  workspace          Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  contracts          Contract[]
-  transactions       Transaction[]
-  complianceItems    ComplianceItem[]
-  generatedDocuments GeneratedDocument[]
+  id                        String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId               String              @map("workspace_id") @db.Uuid
+  ownerId                   String?             @map("owner_id") @db.Uuid
+  purpose                   String
+  storageKey                String              @unique @map("storage_key")
+  contentType               String              @map("content_type")
+  sizeBytes                 BigInt              @map("size_bytes")
+  checksumSha256            String?             @map("checksum_sha256")
+  isPublic                  Boolean             @default(false) @map("is_public")
+  status                    String              @default("pending")
+  variants                  Json                @default("{}")
+  createdAt                 DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  owner                     User?               @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  workspace                 Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  contracts                 Contract[]
+  transactions              Transaction[]
+  complianceItems           ComplianceItem[]
+  generatedDocuments        GeneratedDocument[]
+  ownershipEventDocuments   OwnershipEvent[]    @relation("OwnershipEventDocument")
+  ownershipPaymentDocuments OwnershipPayment[]  @relation("OwnershipPaymentDocument")
+  ownershipNoteDocuments    OwnershipNote[]     @relation("OwnershipNoteDocument")
 
   @@unique([id, workspaceId], map: "uq_files_id_workspace")
   @@index([ownerId], map: "idx_files_owner_id")
@@ -66,18 +69,20 @@ model Contract {
 // ---- 0001_users_and_settings ----
 
 model User {
-  id                   String                @id @db.Uuid
-  email                String                @unique @db.Citext
-  displayName          String                @map("display_name")
-  role                 String                @default("admin")
-  status               String                @default("active")
-  timezone             String                @default("Europe/London")
-  createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt            DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  settings             UserSettings?
-  files                File[]
-  notifications        Notification[]
-  workspaceMemberships WorkspaceMembership[]
+  id                      String                @id @db.Uuid
+  email                   String                @unique @db.Citext
+  displayName             String                @map("display_name")
+  role                    String                @default("admin")
+  status                  String                @default("active")
+  timezone                String                @default("Europe/London")
+  createdAt               DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt               DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  settings                UserSettings?
+  files                   File[]
+  notifications           Notification[]
+  workspaceMemberships    WorkspaceMembership[]
+  recordedOwnershipEvents OwnershipEvent[]      @relation("OwnershipEventRecorder")
+  authoredOwnershipNotes  OwnershipNote[]       @relation("OwnershipNoteAuthor")
 
   @@map("users")
 }
@@ -85,27 +90,30 @@ model User {
 // ---- 0016_workspaces_and_data_isolation ----
 
 model Workspace {
-  id                 String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  name               String
-  status             String                @default("active")
-  createdAt          DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt          DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  memberships        WorkspaceMembership[]
-  properties         Property[]
-  tenants            Tenant[]
-  tenancies          Tenancy[]
-  transactions       Transaction[]
-  complianceItems    ComplianceItem[]
-  reminders          Reminder[]
-  files              File[]
-  contracts          Contract[]
-  generatedDocuments GeneratedDocument[]
-  contractors        Contractor[]
-  contractorReviews  ContractorReview[]
-  notifications      Notification[]
-  jobs               Job[]
-  owners             Owner[]
-  propertyOwnerships PropertyOwnership[]
+  id                        String                     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name                      String
+  status                    String                     @default("active")
+  createdAt                 DateTime                   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                 DateTime                   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  memberships               WorkspaceMembership[]
+  properties                Property[]
+  tenants                   Tenant[]
+  tenancies                 Tenancy[]
+  transactions              Transaction[]
+  complianceItems           ComplianceItem[]
+  reminders                 Reminder[]
+  files                     File[]
+  contracts                 Contract[]
+  generatedDocuments        GeneratedDocument[]
+  contractors               Contractor[]
+  contractorReviews         ContractorReview[]
+  notifications             Notification[]
+  jobs                      Job[]
+  owners                    Owner[]
+  ownershipEvents           OwnershipEvent[]
+  ownershipPayments         OwnershipPayment[]
+  ownershipNotes            OwnershipNote[]
+  ownershipEventAllocations OwnershipEventAllocation[]
 
   @@map("workspaces")
 }
@@ -143,11 +151,13 @@ model Property {
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  tenancies       Tenancy[]
-  transactions    Transaction[]
-  complianceItems ComplianceItem[]
-  ownerships      PropertyOwnership[]
-  workspace       Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tenancies         Tenancy[]
+  transactions      Transaction[]
+  complianceItems   ComplianceItem[]
+  ownershipEvents   OwnershipEvent[]
+  ownershipPayments OwnershipPayment[]
+  ownershipNotes    OwnershipNote[]
+  workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([id, workspaceId], map: "uq_properties_id_workspace")
   @@index([status], map: "idx_properties_status")
@@ -167,33 +177,144 @@ model Owner {
   createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
 
-  workspace  Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  ownerships PropertyOwnership[]
+  workspace        Workspace                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  eventAllocations OwnershipEventAllocation[]
+  soldEvents       OwnershipEvent[]           @relation("OwnershipEventSeller")
+  boughtEvents     OwnershipEvent[]           @relation("OwnershipEventBuyer")
+  paymentsMade     OwnershipPayment[]         @relation("OwnershipPaymentPayer")
+  paymentsReceived OwnershipPayment[]         @relation("OwnershipPaymentRecipient")
+  ownershipNotes   OwnershipNote[]
 
   @@unique([id, workspaceId], map: "uq_owners_id_workspace")
   @@index([workspaceId, fullName], map: "idx_owners_workspace_name")
   @@map("owners")
 }
 
-model PropertyOwnership {
-  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  workspaceId         String   @map("workspace_id") @db.Uuid
-  propertyId          String   @map("property_id") @db.Uuid
-  ownerId             String   @map("owner_id") @db.Uuid
-  ownershipPercentage Decimal  @map("ownership_percentage") @db.Decimal(5, 2)
-  isMainLandlord      Boolean  @default(false) @map("is_main_landlord")
-  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+// ---- 0018_historical_ownership_ledger ----
 
-  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  property  Property  @relation(fields: [propertyId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
-  owner     Owner     @relation(fields: [ownerId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+model OwnershipEvent {
+  id                        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId               String    @map("workspace_id") @db.Uuid
+  propertyId                String    @map("property_id") @db.Uuid
+  eventType                 String    @map("event_type")
+  transferType              String?   @map("transfer_type")
+  effectiveDate             DateTime  @map("effective_date") @db.Date
+  legalCompletionDate       DateTime? @map("legal_completion_date") @db.Date
+  recordedAt                DateTime  @default(now()) @map("recorded_at") @db.Timestamptz(6)
+  recordedByUserId          String?   @map("recorded_by_user_id") @db.Uuid
+  sellerOwnerId             String?   @map("seller_owner_id") @db.Uuid
+  buyerOwnerId              String?   @map("buyer_owner_id") @db.Uuid
+  percentageTransferred     Decimal?  @map("percentage_transferred") @db.Decimal(5, 2)
+  agreedValueCents          BigInt?   @map("agreed_value_cents")
+  currency                  String    @default("GBP") @db.VarChar(3)
+  paymentTreatment          String?   @map("payment_treatment")
+  effectiveAfterFullPayment Boolean   @default(false) @map("effective_after_full_payment")
+  beforeSnapshot            Json      @default("[]") @map("before_snapshot")
+  afterSnapshot             Json      @default("[]") @map("after_snapshot")
+  reason                    String?
+  notes                     String?
+  reversesEventId           String?   @map("reverses_event_id") @db.Uuid
+  documentFileId            String?   @map("document_file_id") @db.Uuid
+  createdAt                 DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
 
-  @@unique([propertyId, ownerId], map: "uq_property_ownerships_property_owner")
-  @@unique([id, workspaceId], map: "uq_property_ownerships_id_workspace")
-  @@index([workspaceId, propertyId], map: "idx_property_ownerships_workspace_property")
-  @@index([workspaceId, ownerId], map: "idx_property_ownerships_workspace_owner")
-  @@map("property_ownerships")
+  workspace      Workspace                  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  property       Property                   @relation(fields: [propertyId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  recordedBy     User?                      @relation("OwnershipEventRecorder", fields: [recordedByUserId], references: [id], onDelete: SetNull)
+  seller         Owner?                     @relation("OwnershipEventSeller", fields: [sellerOwnerId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  buyer          Owner?                     @relation("OwnershipEventBuyer", fields: [buyerOwnerId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  allocations    OwnershipEventAllocation[]
+  payments       OwnershipPayment[]
+  ownershipNotes OwnershipNote[]
+  reversesEvent  OwnershipEvent?            @relation("OwnershipEventReversal", fields: [reversesEventId], references: [id], onDelete: Restrict)
+  reversedBy     OwnershipEvent[]           @relation("OwnershipEventReversal")
+  documentFile   File?                      @relation("OwnershipEventDocument", fields: [documentFileId, workspaceId], references: [id, workspaceId], onDelete: NoAction)
+
+  @@unique([id, workspaceId], map: "uq_ownership_events_id_workspace")
+  @@index([workspaceId, propertyId, effectiveDate(sort: Desc), recordedAt(sort: Desc)], map: "idx_ownership_events_property_date")
+  @@map("ownership_events")
+}
+
+model OwnershipEventAllocation {
+  eventId             String  @map("event_id") @db.Uuid
+  workspaceId         String  @map("workspace_id") @db.Uuid
+  ownerId             String  @map("owner_id") @db.Uuid
+  ownershipPercentage Decimal @map("ownership_percentage") @db.Decimal(5, 2)
+  isMainLandlord      Boolean @default(false) @map("is_main_landlord")
+
+  event     OwnershipEvent @relation(fields: [eventId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  owner     Owner          @relation(fields: [ownerId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  workspace Workspace      @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@id([eventId, ownerId])
+  @@index([workspaceId, ownerId], map: "idx_ownership_event_allocations_owner")
+  @@map("ownership_event_allocations")
+}
+
+model OwnershipPayment {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId           String    @map("workspace_id") @db.Uuid
+  propertyId            String    @map("property_id") @db.Uuid
+  eventId               String?   @map("event_id") @db.Uuid
+  kind                  String
+  payerOwnerId          String?   @map("payer_owner_id") @db.Uuid
+  recipientOwnerId      String?   @map("recipient_owner_id") @db.Uuid
+  amountDueCents        BigInt    @map("amount_due_cents")
+  amountPaidCents       BigInt    @default(0) @map("amount_paid_cents")
+  currency              String    @default("GBP") @db.VarChar(3)
+  dueOn                 DateTime? @map("due_on") @db.Date
+  paidOn                DateTime? @map("paid_on") @db.Date
+  status                String    @default("scheduled")
+  paymentMethod         String?   @map("payment_method")
+  reference             String?
+  throughPropertyFunds  Boolean   @default(false) @map("through_property_funds")
+  propertyFundDirection String?   @map("property_fund_direction")
+  allowOverpayment      Boolean   @default(false) @map("allow_overpayment")
+  notes                 String?
+  documentFileId        String?   @map("document_file_id") @db.Uuid
+  transactionId         String?   @unique @map("transaction_id") @db.Uuid
+  createdAt             DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace      Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  property       Property        @relation(fields: [propertyId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  event          OwnershipEvent? @relation(fields: [eventId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  payer          Owner?          @relation("OwnershipPaymentPayer", fields: [payerOwnerId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  recipient      Owner?          @relation("OwnershipPaymentRecipient", fields: [recipientOwnerId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  documentFile   File?           @relation("OwnershipPaymentDocument", fields: [documentFileId, workspaceId], references: [id, workspaceId], onDelete: NoAction)
+  transaction    Transaction?    @relation(fields: [transactionId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  ownershipNotes OwnershipNote[]
+
+  @@unique([id, workspaceId], map: "uq_ownership_payments_id_workspace")
+  @@unique([transactionId, workspaceId], map: "uq_ownership_payments_transaction_workspace")
+  @@index([workspaceId, propertyId, dueOn], map: "idx_ownership_payments_property_due")
+  @@map("ownership_payments")
+}
+
+model OwnershipNote {
+  id             String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId    String    @map("workspace_id") @db.Uuid
+  propertyId     String    @map("property_id") @db.Uuid
+  ownerId        String?   @map("owner_id") @db.Uuid
+  eventId        String?   @map("event_id") @db.Uuid
+  paymentId      String?   @map("payment_id") @db.Uuid
+  title          String
+  noteText       String    @map("note_text")
+  noteDate       DateTime  @map("note_date") @db.Date
+  authorUserId   String?   @map("author_user_id") @db.Uuid
+  sensitivity    String    @default("workspace")
+  reviewOn       DateTime? @map("review_on") @db.Date
+  documentFileId String?   @map("document_file_id") @db.Uuid
+  createdAt      DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+
+  workspace    Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  property     Property          @relation(fields: [propertyId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  owner        Owner?            @relation(fields: [ownerId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  event        OwnershipEvent?   @relation(fields: [eventId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  payment      OwnershipPayment? @relation(fields: [paymentId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  author       User?             @relation("OwnershipNoteAuthor", fields: [authorUserId], references: [id], onDelete: SetNull)
+  documentFile File?             @relation("OwnershipNoteDocument", fields: [documentFileId, workspaceId], references: [id, workspaceId], onDelete: NoAction)
+
+  @@index([workspaceId, propertyId, noteDate(sort: Desc)], map: "idx_ownership_notes_property_date")
+  @@map("ownership_notes")
 }
 
 // ---- 0003_tenants_tenancies ----
@@ -248,24 +369,26 @@ model Tenancy {
 // ---- 0005_transactions ----
 
 model Transaction {
-  id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  workspaceId   String    @map("workspace_id") @db.Uuid
-  propertyId    String    @map("property_id") @db.Uuid
-  tenancyId     String?   @map("tenancy_id") @db.Uuid
-  direction     String
-  category      String
-  amountCents   Int       @map("amount_cents")
-  occurredOn    DateTime  @map("occurred_on") @db.Date
-  description   String?
-  receiptFileId String?   @map("receipt_file_id") @db.Uuid
-  rentPeriod    DateTime? @map("rent_period") @db.Date
-  createdAt     DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  property      Property  @relation(fields: [propertyId], references: [id], onDelete: Restrict)
-  tenancy       Tenancy?  @relation(fields: [tenancyId], references: [id], onDelete: SetNull)
-  receiptFile   File?     @relation(fields: [receiptFileId], references: [id], onDelete: SetNull)
-  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  id               String            @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId      String            @map("workspace_id") @db.Uuid
+  propertyId       String            @map("property_id") @db.Uuid
+  tenancyId        String?           @map("tenancy_id") @db.Uuid
+  direction        String
+  category         String
+  amountCents      Int               @map("amount_cents")
+  occurredOn       DateTime          @map("occurred_on") @db.Date
+  description      String?
+  receiptFileId    String?           @map("receipt_file_id") @db.Uuid
+  rentPeriod       DateTime?         @map("rent_period") @db.Date
+  createdAt        DateTime          @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime          @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  property         Property          @relation(fields: [propertyId], references: [id], onDelete: Restrict)
+  tenancy          Tenancy?          @relation(fields: [tenancyId], references: [id], onDelete: SetNull)
+  receiptFile      File?             @relation(fields: [receiptFileId], references: [id], onDelete: SetNull)
+  workspace        Workspace         @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ownershipPayment OwnershipPayment?
 
+  @@unique([id, workspaceId], map: "uq_transactions_id_workspace")
   @@index([propertyId, occurredOn(sort: Desc)], map: "idx_transactions_property_id_occurred_on")
   @@index([tenancyId, rentPeriod], map: "idx_transactions_tenancy_id_rent_period")
   @@index([receiptFileId], map: "idx_transactions_receipt_file_id")

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { dateOnly } from "@/lib/schemas/tenancy";
 
 export const PROPERTY_TYPES = ["house", "flat", "hmo", "commercial"] as const;
 
@@ -15,6 +16,7 @@ export const ownerInputSchema = z.object({
 export const propertyOwnershipInputSchema = z
   .object({
     mode: z.enum(["sole", "shared"]),
+    effectiveFrom: dateOnly,
     owners: z.array(ownerInputSchema).min(1).max(20),
   })
   .superRefine((value, ctx) => {
@@ -63,5 +65,6 @@ export const createPropertySchema = z.object({
 });
 
 export const patchPropertySchema = createPropertySchema
+  .omit({ ownership: true })
   .partial()
   .refine((o) => Object.keys(o).length > 0, "at least one field is required");

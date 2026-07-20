@@ -42,7 +42,10 @@ export const GET = apiHandler(async (req) => {
         include: {
           property: {
             include: {
-              ownerships: { where: { isMainLandlord: true }, include: { owner: true } },
+              ownershipEvents: {
+                orderBy: [{ effectiveDate: "desc" }, { recordedAt: "desc" }],
+                include: { allocations: { include: { owner: true } } },
+              },
             },
           },
           tenant: true,

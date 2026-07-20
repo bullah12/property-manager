@@ -58,11 +58,7 @@ const NotificationsTab = dynamic<{ propertyId: string; propertyNickname?: string
   () => import("./tabs/notifications-tab").then((module) => module.NotificationsTab),
   { loading: TabLoadingSkeleton }
 );
-const OwnershipTab = dynamic<{
-  propertyId: string;
-  ownershipMode: "sole" | "shared";
-  ownerships: PropertyDetailDto["ownerships"];
-}>(() => import("./tabs/ownership-tab").then((module) => module.OwnershipTab), {
+const OwnershipTab = dynamic<{ propertyId: string }>(() => import("./tabs/ownership-tab").then((module) => module.OwnershipTab), {
   loading: TabLoadingSkeleton,
 });
 
@@ -233,8 +229,6 @@ export function PropertyDetail({ id }: { id: string }) {
           {property ? (
             <OwnershipTab
               propertyId={id}
-              ownershipMode={property.ownershipMode}
-              ownerships={property.ownerships}
             />
           ) : null}
         </TabsContent>

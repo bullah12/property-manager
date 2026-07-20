@@ -210,12 +210,26 @@ async function seedProperties() {
           email: "taj.zulfiqar@gmail.com",
         },
       });
-      await tx.propertyOwnership.upsert({
-        where: { propertyId_ownerId: { propertyId: id, ownerId: id } },
-        update: { ownershipPercentage: 100, isMainLandlord: true },
+      await tx.ownershipEvent.upsert({
+        where: { id },
+        update: {},
         create: {
+          id,
           workspaceId: requireWorkspaceId(),
           propertyId: id,
+          eventType: "initial",
+          effectiveDate: new Date("2020-01-01T00:00:00Z"),
+          beforeSnapshot: [],
+          afterSnapshot: [{ ownerId: id, ownershipPercentage: 100, isMainLandlord: true }],
+          reason: "Seed opening ownership",
+        },
+      });
+      await tx.ownershipEventAllocation.upsert({
+        where: { eventId_ownerId: { eventId: id, ownerId: id } },
+        update: {},
+        create: {
+          workspaceId: requireWorkspaceId(),
+          eventId: id,
           ownerId: id,
           ownershipPercentage: 100,
           isMainLandlord: true,

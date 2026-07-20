@@ -29,12 +29,17 @@ linked accounts can switch portfolios there without combining their data.
 
 ## Property ownership
 
-Legal owners are workspace-scoped records linked to properties through an
-ownership allocation. Each property has one or more owners, percentages that
-total exactly 100%, and exactly one main landlord used by agreements and other
-single-landlord workflows. The allocation is intentionally a join model so a
-future contribution ledger can attach capital events to both the property and
-the relevant owner without redesigning ownership.
+Legal owners are workspace-scoped identities. Ownership is an immutable,
+effective-dated event ledger: every ownership-changing event stores a complete
+allocation totalling 100% with exactly one main landlord. Current and
+historical positions are derived from those snapshots, and corrections append
+reversal/corrective events instead of overwriting history.
+
+Ownership payments are separate from rent and ordinary expenses. Private
+buyer-to-seller payments never create property transaction rows; payments
+through property funds create an explicitly linked capital/distribution/share
+redemption transaction. This separation is the accounting source for a future
+Investment Performance view and owner-level IRR/XIRR calculations.
 
 After pulling the workspace-isolation change, apply the forward-only migration
 before starting the application:

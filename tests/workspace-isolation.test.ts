@@ -36,7 +36,7 @@ test("owners and ownership allocations are workspace scoped", () => {
   assert.equal(ownerArgs.where.workspaceId, A);
 
   const ownershipArgs = { where: { propertyId: "property", workspaceId: B } };
-  scopeWorkspaceArgs("PropertyOwnership", "findMany", ownershipArgs, A);
+  scopeWorkspaceArgs("OwnershipEventAllocation", "findMany", ownershipArgs, A);
   assert.equal(ownershipArgs.where.workspaceId, A);
 });
 

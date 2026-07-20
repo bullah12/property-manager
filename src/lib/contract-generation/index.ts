@@ -56,14 +56,20 @@ async function handleContractGenerate(job: Job) {
     include: {
       property: {
         include: {
-          ownerships: { where: { isMainLandlord: true }, include: { owner: true } },
+          ownershipEvents: {
+            orderBy: [{ effectiveDate: "desc" }, { recordedAt: "desc" }],
+            include: { allocations: { include: { owner: true } } },
+          },
         },
       },
       tenant: true,
     },
   });
   if (!tenancy) throw new Error("contract.generate: tenancy not found");
-  const mainLandlord = findMainLandlord(tenancy.property.ownerships);
+  const applicableOwnership = tenancy.property.ownershipEvents.find(
+    (event) => event.effectiveDate <= job.createdAt
+  ) ?? tenancy.property.ownershipEvents[0];
+  const mainLandlord = findMainLandlord(applicableOwnership?.allocations ?? []);
 
   // 2–3. BUILD + VALIDATE (fails loudly on any missing field)
   const viewModel = buildLeaseViewModel({

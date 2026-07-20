@@ -1,4 +1,4 @@
-import type { Owner, Property, PropertyOwnership, Tenancy, Tenant } from "@prisma/client";
+import type { Owner, OwnershipEvent, OwnershipEventAllocation, Property, Tenancy, Tenant } from "@prisma/client";
 import type {
   ContractGenerationJobContextDto,
   JobMissingFieldDto,
@@ -7,7 +7,11 @@ import type {
 import { findMainLandlord } from "@/lib/property-ownership";
 
 type ContractJobTenancy = Tenancy & {
-  property: Property & { ownerships: (PropertyOwnership & { owner: Owner })[] };
+  property: Property & {
+    ownershipEvents: (OwnershipEvent & {
+      allocations: (OwnershipEventAllocation & { owner: Owner })[];
+    })[];
+  };
   tenant: Tenant;
 };
 const ERROR_FIELD_LABELS: Record<string, string> = {
@@ -63,7 +67,10 @@ export function buildContractGenerationJobContext(
     if (!tenancy.property.postcode.trim()) {
       addMissingField(missingFields, "property.fullAddress");
     }
-    const mainLandlord = findMainLandlord(tenancy.property.ownerships);
+    const applicableOwnership = tenancy.property.ownershipEvents.find(
+      (event) => event.effectiveDate <= new Date()
+    ) ?? tenancy.property.ownershipEvents[0];
+    const mainLandlord = findMainLandlord(applicableOwnership?.allocations ?? []);
     if (!mainLandlord?.fullName.trim()) {
       addMissingField(missingFields, "landlord.fullName");
     }

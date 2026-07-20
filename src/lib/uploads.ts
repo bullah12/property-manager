@@ -17,6 +17,10 @@ export const UPLOAD_POLICIES = {
     maxBytes: 10 * 1024 * 1024,
     contentTypes: ["application/pdf", "image/jpeg", "image/png"],
   },
+  "ownership-doc": {
+    maxBytes: 25 * 1024 * 1024,
+    contentTypes: ["application/pdf", "image/jpeg", "image/png"],
+  },
 } as const;
 
 export type UploadPurpose = keyof typeof UPLOAD_POLICIES;

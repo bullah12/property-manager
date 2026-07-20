@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { dateOnly } from "@/lib/schemas/tenancy";
 
-export const INCOME_CATEGORIES = ["rent", "deposit", "other"] as const;
+export const INCOME_CATEGORIES = ["rent", "deposit", "capital_contribution", "other"] as const;
 export const EXPENSE_CATEGORIES = [
   "repairs",
   "maintenance",
@@ -10,6 +10,9 @@ export const EXPENSE_CATEGORIES = [
   "certificates",
   "agent_fees",
   "utilities",
+  "capital_withdrawal",
+  "distribution",
+  "share_redemption",
   "other",
 ] as const;
 
