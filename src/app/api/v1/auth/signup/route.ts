@@ -3,6 +3,8 @@ import { ApiError, conflict } from "@/lib/api/errors";
 import { apiHandler } from "@/lib/api/handler";
 import { ok } from "@/lib/api/respond";
 import { parseBody } from "@/lib/api/validate";
+import { prisma } from "@/lib/db";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 const signupSchema = z.object({
@@ -13,6 +15,10 @@ const signupSchema = z.object({
 
 export const POST = apiHandler(async (req) => {
   const { displayName, email, password } = await parseBody(req, signupSchema);
+  if (await accountExists(email)) {
+    throw conflict("An account with this email already exists. Sign in instead.");
+  }
+
   const supabase = await createSupabaseServerClient();
   const appUrl = process.env.APP_URL?.trim() || req.nextUrl.origin;
   const emailRedirectTo = new URL("/auth/confirm", appUrl).toString();
@@ -32,7 +38,7 @@ export const POST = apiHandler(async (req) => {
       status: error.status,
       message: error.message,
     });
-    throw signupError(error.code, error.message);
+    throw signupError(error.code, error.message, error.name, error.status);
   }
 
   return ok(
@@ -44,7 +50,46 @@ export const POST = apiHandler(async (req) => {
   );
 });
 
-function signupError(code: string | undefined, providerMessage: string): ApiError {
+async function accountExists(email: string): Promise<boolean> {
+  const appUser = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true },
+  });
+  if (appUser) return true;
+
+  // Supabase deliberately obscures duplicate signups when email confirmation
+  // is enabled. The server-only Admin API lets this owner-facing app provide
+  // the explicit duplicate-account message requested by the product.
+  const admin = createSupabaseAdminClient();
+  const normalizedEmail = email.toLowerCase();
+  const perPage = 1000;
+  for (let page = 1; page <= 100; page++) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
+    if (error) {
+      console.error("[auth.signup] Unable to check existing Auth users:", {
+        name: error.name,
+        code: error.code,
+        status: error.status,
+        message: error.message,
+      });
+      // Do not turn a diagnostic lookup failure into an outage; signUp still
+      // performs Supabase's own duplicate handling.
+      return false;
+    }
+    if (data.users.some((user) => user.email?.toLowerCase() === normalizedEmail)) {
+      return true;
+    }
+    if (data.users.length < perPage) return false;
+  }
+  return false;
+}
+
+function signupError(
+  code: string | undefined,
+  providerMessage: string,
+  errorName: string,
+  status: number | undefined
+): ApiError {
   switch (code) {
     case "signup_disabled":
     case "email_provider_disabled":
@@ -67,12 +112,18 @@ function signupError(code: string | undefined, providerMessage: string): ApiErro
       );
     case "email_exists":
     case "user_already_exists":
-      return conflict("Unable to create account. Try signing in or use a different email.");
+      return conflict("An account with this email already exists. Sign in instead.");
     default:
+      if (status && status >= 500) {
+        return new ApiError(
+          "INTERNAL",
+          "Supabase Auth could not complete account creation. Check the Supabase Auth logs and SMTP configuration, then try again."
+        );
+      }
       return conflict(
         code
           ? `Unable to create account (Supabase: ${code}).`
-          : `Unable to create account (Supabase Auth: ${safeProviderMessage(providerMessage)}).`
+          : `Unable to create account (Supabase Auth ${errorName}: ${safeProviderMessage(providerMessage)}).`
       );
   }
 }
