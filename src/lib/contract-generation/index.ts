@@ -5,6 +5,7 @@ import { prisma } from "@/lib/db";
 import { enqueueJob, registerJobHandler } from "@/lib/jobs";
 import { getOwner, notify } from "@/lib/notify";
 import { uploadToStorage } from "@/lib/storage";
+import { buildGeneratedLeaseFilename } from "./filename";
 import { renderLeasePdf } from "./render";
 import { buildLeaseViewModel, TEMPLATE_VERSION, type ClauseInput } from "./view-model";
 
@@ -18,6 +19,7 @@ export interface GeneratePayload {
   tenancyId: string;
   kind: "lease" | "renewal";
   clauses: ClauseInput;
+  reletLevyCents?: number;
 }
 
 /** Route-side validation + enqueue → 202 (PLAN.md §6). */
@@ -45,6 +47,8 @@ async function handleContractGenerate(job: Job) {
 
   // 1. LOAD
   const owner = await getOwner();
+  const settings = await prisma.userSettings.findUnique({ where: { userId: owner.id } });
+  if (!settings) throw new Error("contract.generate: owner settings not found");
   const tenancy = await prisma.tenancy.findUnique({
     where: { id: payload.tenancyId },
     include: { property: true, tenant: true },
@@ -54,18 +58,20 @@ async function handleContractGenerate(job: Job) {
   // 2–3. BUILD + VALIDATE (fails loudly on any missing field)
   const viewModel = buildLeaseViewModel({
     owner,
+    settings,
     property: tenancy.property,
     tenancy,
     tenant: tenancy.tenant,
     clauses: payload.clauses,
+    reletLevyCents: payload.reletLevyCents,
   });
 
   // 4–5. LAYOUT + WRITE PDF (directly; no browser runtime)
   const pdf = renderLeasePdf(viewModel);
 
   // 6. STORE via the files pattern (purpose='generated-lease', private)
-  const shortId = tenancy.id.slice(0, 8);
-  const storageKey = `generated-lease/${randomUUID()}/lease-${shortId}.pdf`;
+  const filename = buildGeneratedLeaseFilename(viewModel);
+  const storageKey = `generated-lease/${randomUUID()}/${filename}`;
   await uploadToStorage(storageKey, pdf, "application/pdf");
   const file = await prisma.file.create({
     data: {

@@ -5,6 +5,7 @@ import { cn } from "@/lib/utils";
 const STYLES: Record<string, string> = {
   // properties
   active: "bg-emerald-100 text-emerald-800 border-emerald-200",
+  inactive: "bg-muted text-muted-foreground",
   archived: "bg-muted text-muted-foreground",
   // tenancies / contracts
   draft: "bg-sky-100 text-sky-800 border-sky-200",

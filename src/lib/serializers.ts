@@ -1,6 +1,8 @@
 import type {
   ComplianceItem,
   Contract,
+  Contractor,
+  ContractorReview,
   File,
   Job,
   Notification,
@@ -59,6 +61,38 @@ export function serializeTenant(t: Tenant) {
     notes: t.notes,
     createdAt: t.createdAt.toISOString(),
     updatedAt: t.updatedAt.toISOString(),
+  };
+}
+
+export function serializeContractor(c: Contractor) {
+  return {
+    id: c.id,
+    businessName: c.businessName,
+    contactName: c.contactName,
+    trade: c.trade,
+    email: c.email,
+    phone: c.phone,
+    website: c.website,
+    serviceArea: c.serviceArea,
+    registrationNumber: c.registrationNumber,
+    notes: c.notes,
+    status: c.status,
+    createdAt: c.createdAt.toISOString(),
+    updatedAt: c.updatedAt.toISOString(),
+  };
+}
+
+export function serializeContractorReview(review: ContractorReview) {
+  return {
+    id: review.id,
+    contractorId: review.contractorId,
+    rating: review.rating,
+    reviewedOn: toDateOnly(review.reviewedOn),
+    workDescription: review.workDescription,
+    comments: review.comments,
+    wouldHireAgain: review.wouldHireAgain,
+    createdAt: review.createdAt.toISOString(),
+    updatedAt: review.updatedAt.toISOString(),
   };
 }
 
@@ -232,6 +266,8 @@ export function serializeSettings(s: UserSettings) {
     defaultLeadDays: s.defaultLeadDays,
     rentOverdueGraceDays: s.rentOverdueGraceDays,
     emailEnabled: s.emailEnabled,
+    landlordAddress: s.landlordAddress,
+    landlordPhone: s.landlordPhone,
     clausePetsDefault: s.clausePetsDefault,
     clauseGardenDefault: s.clauseGardenDefault,
     updatedAt: s.updatedAt.toISOString(),

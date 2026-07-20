@@ -10,6 +10,7 @@ import { execFileSync } from "node:child_process";
 import { mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
+import { buildGeneratedLeaseFilename } from "../src/lib/contract-generation/filename";
 import { renderLeasePdf } from "../src/lib/contract-generation/render";
 import { leaseV1Schema } from "../src/lib/contract-generation/view-model";
 import "dotenv/config";
@@ -18,26 +19,27 @@ const GOLDEN_PATH = path.join(process.cwd(), "tests", "golden", "lease-v1.txt");
 
 /** Fixture view model — every merge field exercised, both clauses on. */
 const fixture = leaseV1Schema.parse({
-  landlord: { fullName: "Alex Landlord" },
-  tenant: { fullName: "Priya Shah" },
-  property: {
-    addressLine1: "Flat 12, Harbour Quay, 3 Dockside Road",
-    city: "Bristol",
-    postcode: "BS1 4RT",
+  landlord: {
+    fullName: "Zulfiqar Ali Taj",
+    address: "25 Aiskew Grove, Stockton-on-Tees TS19 7QS, UK",
+    phone: "07847 617821",
+    email: "taj.zulfiqar@gmail.com",
   },
+  tenant: { fullName: "Noreen Akhtar", phone: "07933 651414", email: null },
+  property: { fullAddress: "322 Alum Rock Rd, Alum Rock, Birmingham B8 3DD, UK" },
   tenancy: {
-    startDateLong: "1 August 2026",
-    endDateLong: "31 July 2027",
-    termMonthsWords: "twelve months",
-    rentAmountLegal: "one thousand two hundred and fifty pounds (£1,250.00)",
-    rentDueDayOrdinal: "5th",
-    depositAmountLegal: "one thousand four hundred and forty-two pounds (£1,442.00)",
-    depositSchemeName: "mydeposits (custodial)",
+    startDateLong: "1 July 2026",
+    startDateIso: "2026-07-01",
+    rentAmountDisplay: "£1,050.00",
+    rentDueDayOrdinal: "1st",
+    depositAmountDisplay: "£1,050.00",
+    depositSchemeName: "mydeposits",
     depositReference: "MYD-88104",
+    reletLevyDisplay: "£1,700.00",
   },
   clauses: {
     pets: true,
-    petsDescription: "one small dog (terrier)",
+    petsDescription: "one small dog",
     garden: true,
   },
 });
@@ -54,7 +56,10 @@ async function extractText(pdf: Buffer): Promise<string> {
     .map((l: string) => l.replace(/\s+/g, " ").trim())
     .filter(
       (l: string) =>
-        l.length > 0 && !/^-- \d+ of \d+ --$/.test(l) && !/^Page \d+ of \d+$/.test(l)
+        l.length > 0 &&
+        !/^-- \d+ of \d+ --$/.test(l) &&
+        !/^Page \d+ of \d+$/.test(l) &&
+        !/^Assured Periodic Tenancy Agreement \| Page \d+ of \d+$/.test(l)
     )
     .join("\n");
 }
@@ -63,6 +68,13 @@ async function main() {
   const update = process.argv.includes("--update");
   const pdf = renderLeasePdf(fixture);
   const text = await extractText(pdf);
+  const filename = buildGeneratedLeaseFilename(fixture);
+  if (
+    filename !==
+    "Tenancy_Agreement_Zulfiqar-Ali-Taj_Noreen-Akhtar_2026-07-01.pdf"
+  ) {
+    throw new Error(`Unexpected generated filename: ${filename}`);
+  }
 
   if (update) {
     writeFileSync(GOLDEN_PATH, text + "\n");

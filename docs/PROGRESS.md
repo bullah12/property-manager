@@ -359,12 +359,13 @@ example template wording is preserved by the versioned direct renderer
 (`templates/documents/lease/v1/` documents the implementation; v2+ would sit
 alongside). §5.4 pipeline as a background `contract.generate` job:
 view-model builder with all legal formatting (`formatDateLong`,
-`numberToWords`, `moneyLegal` → "one thousand two hundred and fifty pounds
-(£1,250.00)", `ordinal`, `termMonths`), a Zod schema for `lease/v1` that
+`moneyDisplay` → "£1,250.00", and `ordinal`), landlord/tenant contact fields,
+and a Zod schema for `lease/v1` that
 fails loudly on any missing/empty field, then writes a searchable A4 PDF
 directly with deterministic wrapping, pagination, standard fonts, and no
 browser process. The result is stored via the files pattern
-(`generated-lease/<uuid>/lease-<short-id>.pdf`, private, checksummed),
+(`generated-lease/<uuid>/Tenancy_Agreement_<landlord>_<tenant>_<start-date>.pdf`,
+private, checksummed),
 `generated_documents` row with the exact `input_snapshot`, `contracts` draft
 row (`source='generated'`), then `notify(contract.generated)` (in-app only
 per the §5.3 catalog; `contract.generation_failed` emails via the job's

@@ -2,7 +2,8 @@ import type { LeaseV1ViewModel } from "./view-model";
 
 export type LeaseTemplateItem =
   | { kind: "paragraph"; text: string }
-  | { kind: "list"; items: string[] };
+  | { kind: "list"; items: string[] }
+  | { kind: "property" };
 
 export interface LeaseTemplateSection {
   title: string;
@@ -29,6 +30,7 @@ export function buildLeaseSections(viewModel: LeaseV1ViewModel): LeaseTemplateSe
         paragraph(
           "1.2  The Landlord agrees to let to the Tenant, and the Tenant agrees to take a tenancy of the property known as:"
         ),
+        { kind: "property" },
         paragraph("1.3  The Property is let for use as residential premises only."),
         paragraph(
           "1.4  No smoking is permitted anywhere on the Property by the Tenant, members of the Tenant's household, or any guests or visitors."

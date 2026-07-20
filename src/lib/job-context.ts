@@ -1,4 +1,4 @@
-import type { Property, Tenancy, Tenant } from "@prisma/client";
+import type { Property, Tenancy, Tenant, UserSettings } from "@prisma/client";
 import type {
   ContractGenerationJobContextDto,
   JobMissingFieldDto,
@@ -6,19 +6,20 @@ import type {
 } from "@/lib/types";
 
 type ContractJobTenancy = Tenancy & { property: Property; tenant: Tenant };
+type ContractJobSettings = Pick<UserSettings, "landlordAddress" | "landlordPhone">;
 
 const ERROR_FIELD_LABELS: Record<string, string> = {
   "landlord.fullName": "Landlord name",
+  "landlord.address": "Landlord correspondence address (Settings)",
+  "landlord.phone": "Landlord phone (Settings)",
   "tenant.fullName": "Tenant name",
-  "property.addressLine1": "Property address",
-  "property.city": "Property city",
-  "property.postcode": "Property postcode",
+  "tenant.phone": "Tenant phone",
+  "property.fullAddress": "Property address",
   "tenancy.startDateLong": "Tenancy start date",
-  "tenancy.endDateLong": "Tenancy end date",
-  "tenancy.termMonthsWords": "Tenancy term",
-  "tenancy.rentAmountLegal": "Rent amount",
+  "tenancy.startDateIso": "Tenancy start date",
+  "tenancy.rentAmountDisplay": "Rent amount",
   "tenancy.rentDueDayOrdinal": "Rent due day",
-  "tenancy.depositAmountLegal": "Deposit amount",
+  "tenancy.depositAmountDisplay": "Deposit amount",
   "tenancy.depositSchemeName": "Deposit scheme",
   "tenancy.depositReference": "Deposit reference",
   "clauses.petsDescription": "Pet description",
@@ -26,10 +27,11 @@ const ERROR_FIELD_LABELS: Record<string, string> = {
 
 const CURRENT_DATA_PATHS = new Set([
   "tenant.fullName",
-  "property.addressLine1",
-  "property.city",
-  "property.postcode",
-  "tenancy.depositAmountLegal",
+  "tenant.phone",
+  "landlord.address",
+  "landlord.phone",
+  "property.fullAddress",
+  "tenancy.depositAmountDisplay",
   "tenancy.depositSchemeName",
   "tenancy.depositReference",
 ]);
@@ -51,6 +53,7 @@ export function buildContractGenerationJobContext(
   tenancyId: string,
   contractKind: "lease" | "renewal",
   tenancy: ContractJobTenancy | undefined,
+  settings: ContractJobSettings | null,
   lastError: string | null
 ): ContractGenerationJobContextDto {
   const missingFields: JobMissingFieldDto[] = [];
@@ -59,17 +62,20 @@ export function buildContractGenerationJobContext(
     if (!tenancy.tenant.fullName.trim()) {
       addMissingField(missingFields, "tenant.fullName");
     }
+    if (!tenancy.tenant.phone?.trim()) {
+      addMissingField(missingFields, "tenant.phone");
+    }
     if (!tenancy.property.addressLine1.trim()) {
-      addMissingField(missingFields, "property.addressLine1");
+      addMissingField(missingFields, "property.fullAddress");
     }
     if (!tenancy.property.city.trim()) {
-      addMissingField(missingFields, "property.city");
+      addMissingField(missingFields, "property.fullAddress");
     }
     if (!tenancy.property.postcode.trim()) {
-      addMissingField(missingFields, "property.postcode");
+      addMissingField(missingFields, "property.fullAddress");
     }
     if (tenancy.depositAmountCents == null) {
-      addMissingField(missingFields, "tenancy.depositAmountLegal");
+      addMissingField(missingFields, "tenancy.depositAmountDisplay");
     }
     if (!tenancy.depositScheme?.trim()) {
       addMissingField(missingFields, "tenancy.depositSchemeName");
@@ -79,6 +85,13 @@ export function buildContractGenerationJobContext(
     }
   } else {
     addMissingField(missingFields, "tenancy", "Tenancy record");
+  }
+
+  if (!settings?.landlordAddress?.trim()) {
+    addMissingField(missingFields, "landlord.address");
+  }
+  if (!settings?.landlordPhone?.trim()) {
+    addMissingField(missingFields, "landlord.phone");
   }
 
   if (lastError) {
@@ -95,6 +108,9 @@ export function buildContractGenerationJobContext(
     ? `/properties/${tenancy.propertyId}?tab=tenancy`
     : null;
   const canEditTenancy = tenancy?.status === "draft";
+  const needsLandlordSettings = missingFields.some((field) =>
+    field.path.startsWith("landlord.")
+  );
 
   return {
     kind: "contract-generation",
@@ -106,7 +122,11 @@ export function buildContractGenerationJobContext(
     propertyNickname: tenancy?.property.nickname ?? null,
     missingFields,
     linkPath: propertyPath,
-    editPath: canEditTenancy ? `/tenancies/${tenancyId}/edit` : propertyPath,
+    editPath: needsLandlordSettings
+      ? "/settings"
+      : canEditTenancy
+        ? `/tenancies/${tenancyId}/edit`
+        : propertyPath,
     canEditTenancy,
   };
 }

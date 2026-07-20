@@ -4,6 +4,7 @@ import {
   LayoutDashboard,
   Settings,
   Users,
+  Wrench,
   type LucideIcon,
 } from "lucide-react";
 
@@ -20,6 +21,7 @@ export const navItems: NavItem[] = [
   { title: "Overview", href: "/", icon: LayoutDashboard },
   { title: "Properties", href: "/properties", icon: Building2 },
   { title: "Tenants", href: "/tenants", icon: Users },
+  { title: "Contractors", href: "/contractors", icon: Wrench },
   { title: "Notifications", href: "/notifications", icon: Bell, showUnreadBadge: true },
   { title: "Settings", href: "/settings", icon: Settings },
 ];

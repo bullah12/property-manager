@@ -1,4 +1,4 @@
-import type { Property, Tenancy, Tenant, User } from "@prisma/client";
+import type { Property, Tenancy, Tenant, User, UserSettings } from "@prisma/client";
 import { z } from "zod";
 import { toDateOnly } from "@/lib/dates";
 
@@ -13,22 +13,27 @@ export const TEMPLATE_VERSION = "lease/v1";
 const nonEmpty = z.string().trim().min(1);
 
 export const leaseV1Schema = z.object({
-  landlord: z.object({ fullName: nonEmpty }),
-  tenant: z.object({ fullName: nonEmpty }),
-  property: z.object({
-    addressLine1: nonEmpty,
-    city: nonEmpty,
-    postcode: nonEmpty,
+  landlord: z.object({
+    fullName: nonEmpty,
+    address: nonEmpty,
+    phone: nonEmpty,
+    email: z.string().trim().pipe(z.email()),
   }),
+  tenant: z.object({
+    fullName: nonEmpty,
+    phone: nonEmpty,
+    email: z.string().trim().pipe(z.email()).nullable(),
+  }),
+  property: z.object({ fullAddress: nonEmpty }),
   tenancy: z.object({
     startDateLong: nonEmpty,
-    endDateLong: nonEmpty,
-    termMonthsWords: nonEmpty,
-    rentAmountLegal: nonEmpty,
+    startDateIso: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
+    rentAmountDisplay: nonEmpty,
     rentDueDayOrdinal: nonEmpty,
-    depositAmountLegal: nonEmpty,
+    depositAmountDisplay: nonEmpty,
     depositSchemeName: nonEmpty,
     depositReference: nonEmpty,
+    reletLevyDisplay: nonEmpty.optional(),
   }),
   clauses: z
     .object({
@@ -113,6 +118,14 @@ export function moneyLegal(cents: number): string {
   return `${words} (${numeric})`;
 }
 
+/** 105000 → "£1,050.00" */
+export function moneyDisplay(cents: number): string {
+  return `£${(cents / 100).toLocaleString("en-GB", {
+    minimumFractionDigits: 2,
+    maximumFractionDigits: 2,
+  })}`;
+}
+
 /** 1 → "1st", 2 → "2nd", 21 → "21st" */
 export function ordinal(n: number): string {
   const mod100 = n % 100;
@@ -139,34 +152,47 @@ export function termMonths(start: Date, end: Date): number {
 
 export function buildLeaseViewModel(opts: {
   owner: User;
+  settings: UserSettings;
   property: Property;
   tenancy: Tenancy;
   tenant: Tenant;
   clauses: ClauseInput;
+  reletLevyCents?: number;
 }): LeaseV1ViewModel {
-  const { owner, property, tenancy, tenant, clauses } = opts;
-  const months = termMonths(tenancy.startDate, tenancy.endDate);
+  const { owner, settings, property, tenancy, tenant, clauses, reletLevyCents } = opts;
+  const propertyAddress = [
+    property.addressLine1,
+    property.addressLine2,
+    property.city,
+    property.postcode,
+    "UK",
+  ]
+    .filter(Boolean)
+    .join(", ");
 
   const candidate = {
-    landlord: { fullName: owner.displayName },
-    tenant: { fullName: tenant.fullName },
-    property: {
-      addressLine1: property.addressLine2
-        ? `${property.addressLine1}, ${property.addressLine2}`
-        : property.addressLine1,
-      city: property.city,
-      postcode: property.postcode,
+    landlord: {
+      fullName: owner.displayName,
+      address: settings.landlordAddress ?? "",
+      phone: settings.landlordPhone ?? "",
+      email: owner.email,
     },
+    tenant: {
+      fullName: tenant.fullName,
+      phone: tenant.phone ?? "",
+      email: tenant.email,
+    },
+    property: { fullAddress: propertyAddress },
     tenancy: {
       startDateLong: formatDateLong(tenancy.startDate),
-      endDateLong: formatDateLong(tenancy.endDate),
-      termMonthsWords: `${numberToWords(months)} month${months === 1 ? "" : "s"}`,
-      rentAmountLegal: moneyLegal(tenancy.rentAmountCents),
+      startDateIso: toDateOnly(tenancy.startDate),
+      rentAmountDisplay: moneyDisplay(tenancy.rentAmountCents),
       rentDueDayOrdinal: ordinal(tenancy.rentDueDay),
-      depositAmountLegal:
-        tenancy.depositAmountCents != null ? moneyLegal(tenancy.depositAmountCents) : "",
+      depositAmountDisplay:
+        tenancy.depositAmountCents != null ? moneyDisplay(tenancy.depositAmountCents) : "",
       depositSchemeName: tenancy.depositScheme ?? "",
       depositReference: tenancy.depositReference ?? "",
+      ...(reletLevyCents != null ? { reletLevyDisplay: moneyDisplay(reletLevyCents) } : {}),
     },
     clauses: {
       pets: clauses.pets,

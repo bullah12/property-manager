@@ -457,6 +457,7 @@ function GenerateContractDialog({
   const [pets, setPets] = useState(false);
   const [petsDescription, setPetsDescription] = useState("");
   const [garden, setGarden] = useState(false);
+  const [reletLevy, setReletLevy] = useState("");
   const [busy, setBusy] = useState(false);
   const [defaultsApplied, setDefaultsApplied] = useState(false);
 
@@ -474,10 +475,17 @@ function GenerateContractDialog({
       toast.error("Describe the pet(s) for the pets clause");
       return;
     }
+    if (reletLevy && !/^\d+(\.\d{1,2})?$/.test(reletLevy)) {
+      toast.error("Enter the re-letting charge in pounds, e.g. 1700.00");
+      return;
+    }
     setBusy(true);
     try {
       await api.post(`/api/v1/tenancies/${target}/contracts/generate`, {
         kind,
+        ...(reletLevy
+          ? { reletLevyCents: Math.round(parseFloat(reletLevy) * 100) }
+          : {}),
         clauses: {
           pets,
           ...(pets ? { petsDescription: petsDescription.trim() } : {}),
@@ -552,6 +560,19 @@ function GenerateContractDialog({
                 Garden maintenance clause
               </Label>
             </div>
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="gen-relet-levy">Early-vacation re-letting charge (optional)</Label>
+            <Input
+              id="gen-relet-levy"
+              inputMode="decimal"
+              placeholder="e.g. 1700.00"
+              value={reletLevy}
+              onChange={(event) => setReletLevy(event.target.value)}
+            />
+            <p className="text-xs text-muted-foreground">
+              Leave blank to state that only lawful, reasonable re-letting costs may be recovered.
+            </p>
           </div>
         </div>
         <DialogFooter>

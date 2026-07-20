@@ -15,6 +15,8 @@ export interface SettingsDto {
   defaultLeadDays: number[];
   rentOverdueGraceDays: number;
   emailEnabled: boolean;
+  landlordAddress: string | null;
+  landlordPhone: string | null;
   clausePetsDefault: boolean;
   clauseGardenDefault: boolean;
   updatedAt: string;
@@ -62,6 +64,62 @@ export interface TenantDto {
 export interface TenantListItemDto extends TenantDto {
   tenancyCount: number;
   currentProperties: string[];
+}
+
+export type ContractorTrade =
+  | "plumber"
+  | "electrician"
+  | "gas_engineer"
+  | "heating_engineer"
+  | "builder"
+  | "handyman"
+  | "roofer"
+  | "decorator"
+  | "locksmith"
+  | "cleaner"
+  | "gardener"
+  | "pest_control"
+  | "drainage"
+  | "appliance_repair"
+  | "other";
+
+export interface ContractorDto {
+  id: string;
+  businessName: string;
+  contactName: string | null;
+  trade: ContractorTrade;
+  email: string | null;
+  phone: string | null;
+  website: string | null;
+  serviceArea: string | null;
+  registrationNumber: string | null;
+  notes: string | null;
+  status: "active" | "inactive";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContractorListItemDto extends ContractorDto {
+  averageRating: number | null;
+  reviewCount: number;
+}
+
+export interface ContractorReviewDto {
+  id: string;
+  contractorId: string;
+  rating: number;
+  reviewedOn: string;
+  workDescription: string;
+  comments: string | null;
+  wouldHireAgain: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface ContractorDetailDto extends ContractorDto {
+  averageRating: number | null;
+  reviewCount: number;
+  reviews: ContractorReviewDto[];
 }
 
 export type TenancyStatus = "draft" | "active" | "ended" | "renewed";

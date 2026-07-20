@@ -707,7 +707,7 @@ Job handler:
 4. LAYOUT  lease/v1 directly into A4 pages (wrapping + pagination)
 5. WRITE   a searchable PDF buffer with no browser/runtime process
 6. STORE   via the files pattern: purpose='generated-lease', private,
-           storage_key='generated-lease/<uuid>/lease-<tenancy-short-id>.pdf',
+           storage_key='generated-lease/<uuid>/Tenancy_Agreement_<landlord>_<tenant>_<start-date>.pdf',
            checksum recorded, status='ready'
 7. INSERT  generated_documents { doc_type:'lease', template_version:'lease/v1',
            subject_type:'tenancy', subject_id, file_id, input_snapshot: <view model> }

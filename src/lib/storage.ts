@@ -35,10 +35,14 @@ export async function uploadToStorage(
   if (error) throw new Error(`Storage upload failed: ${error.message}`);
 }
 
-export async function createSignedDownloadUrl(key: string): Promise<string> {
+export async function createSignedDownloadUrl(
+  key: string,
+  downloadFilename?: string
+): Promise<string> {
   const { data, error } = await storageClient().createSignedUrl(
     key,
-    SIGNED_URL_TTL_SECONDS
+    SIGNED_URL_TTL_SECONDS,
+    downloadFilename ? { download: downloadFilename } : undefined
   );
   if (error || !data) throw new Error(`Could not sign URL: ${error?.message}`);
   return data.signedUrl;

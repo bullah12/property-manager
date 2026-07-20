@@ -16,10 +16,10 @@ const listQuery = paginationQuery.extend({
 
 /** Actionable queue visibility, including contract-generation prerequisites. */
 export const GET = apiHandler(async (req) => {
-  await requireAdmin();
+  const { user } = await requireAdmin();
   const q = parseQuery(req, listQuery);
   const where: Prisma.JobWhereInput = q.status ? { status: q.status } : {};
-  const [total, rows] = await prisma.$transaction([
+  const [total, rows, settings] = await prisma.$transaction([
     prisma.job.count({ where }),
     prisma.job.findMany({
       where,
@@ -27,6 +27,7 @@ export const GET = apiHandler(async (req) => {
       skip: (q.page - 1) * q.perPage,
       take: q.perPage,
     }),
+    prisma.userSettings.findUnique({ where: { userId: user.id } }),
   ]);
 
   const contractPayloads = rows.flatMap((job) => {
@@ -55,6 +56,7 @@ export const GET = apiHandler(async (req) => {
           payload.tenancyId,
           contractKind,
           tenancyById.get(payload.tenancyId),
+          settings,
           job.lastError
         )
       : null;

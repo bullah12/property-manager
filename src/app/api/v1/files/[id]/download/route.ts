@@ -16,6 +16,7 @@ export const GET = apiHandler<{ id: string }>(async (_req, { params }) => {
   const file = await prisma.file.findUnique({ where: { id } });
   if (!file) throw notFound("File");
   if (file.status !== "ready") throw conflict("File is not ready for download");
-  const url = await createSignedDownloadUrl(file.storageKey);
-  return ok({ url, expiresInSeconds: SIGNED_URL_TTL_SECONDS });
+  const filename = file.storageKey.split("/").pop() ?? "download";
+  const url = await createSignedDownloadUrl(file.storageKey, filename);
+  return ok({ url, filename, expiresInSeconds: SIGNED_URL_TTL_SECONDS });
 });

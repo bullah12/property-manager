@@ -257,6 +257,8 @@ model UserSettings {
   defaultLeadDays      Int[]    @default([60, 30, 7]) @map("default_lead_days")
   rentOverdueGraceDays Int      @default(3) @map("rent_overdue_grace_days")
   emailEnabled         Boolean  @default(true) @map("email_enabled")
+  landlordAddress      String?  @map("landlord_address")
+  landlordPhone        String?  @map("landlord_phone")
   clausePetsDefault    Boolean  @default(false) @map("clause_pets_default")
   clauseGardenDefault  Boolean  @default(false) @map("clause_garden_default")
   createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -264,4 +266,42 @@ model UserSettings {
   user                 User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@map("user_settings")
+}
+
+// ---- 0012_contractors ----
+
+model Contractor {
+  id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  businessName       String             @map("business_name")
+  contactName        String?            @map("contact_name")
+  trade              String
+  email              String?            @db.Citext
+  phone              String?
+  website            String?
+  serviceArea        String?            @map("service_area")
+  registrationNumber String?            @map("registration_number")
+  notes              String?
+  status             String             @default("active")
+  createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  reviews            ContractorReview[]
+
+  @@index([status, trade], map: "idx_contractors_status_trade")
+  @@map("contractors")
+}
+
+model ContractorReview {
+  id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  contractorId    String     @map("contractor_id") @db.Uuid
+  rating          Int
+  reviewedOn      DateTime   @default(now()) @map("reviewed_on") @db.Date
+  workDescription String     @map("work_description")
+  comments        String?
+  wouldHireAgain  Boolean    @default(true) @map("would_hire_again")
+  createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  contractor      Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)
+
+  @@index([contractorId, reviewedOn(sort: Desc)], map: "idx_contractor_reviews_contractor_reviewed")
+  @@map("contractor_reviews")
 }

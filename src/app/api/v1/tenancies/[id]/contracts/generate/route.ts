@@ -10,6 +10,7 @@ const paramsSchema = z.object({ id: z.uuid() });
 
 const bodySchema = z.object({
   kind: z.enum(["lease", "renewal"]).default("lease"),
+  reletLevyCents: z.number().int().min(0).max(10_000_000).optional(),
   clauses: z
     .object({
       pets: z.boolean().default(false),
@@ -28,6 +29,7 @@ export const POST = apiHandler<{ id: string }>(async (req, { params }) => {
     tenancyId: id,
     kind: body.kind,
     clauses: body.clauses,
+    reletLevyCents: body.reletLevyCents,
   });
   kickJobRunner();
   return ok({ jobId: job.id, status: "queued" }, 202);
