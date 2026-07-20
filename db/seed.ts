@@ -187,10 +187,40 @@ async function seedProperties() {
   ];
   for (const p of properties) {
     const { id, ...data } = p;
-    await prisma.property.upsert({
-      where: { id },
-      update: data,
-      create: { id, workspaceId: requireWorkspaceId(), ...data },
+    await prisma.$transaction(async (tx) => {
+      await tx.property.upsert({
+        where: { id },
+        update: data,
+        create: { id, workspaceId: requireWorkspaceId(), ...data },
+      });
+      await tx.owner.upsert({
+        where: { id },
+        update: {
+          fullName: "Zulfiqar Ali Taj",
+          address: "25 Aiskew Grove, Stockton-on-Tees TS19 7QS, UK",
+          phone: "07847 617821",
+          email: "taj.zulfiqar@gmail.com",
+        },
+        create: {
+          id,
+          workspaceId: requireWorkspaceId(),
+          fullName: "Zulfiqar Ali Taj",
+          address: "25 Aiskew Grove, Stockton-on-Tees TS19 7QS, UK",
+          phone: "07847 617821",
+          email: "taj.zulfiqar@gmail.com",
+        },
+      });
+      await tx.propertyOwnership.upsert({
+        where: { propertyId_ownerId: { propertyId: id, ownerId: id } },
+        update: { ownershipPercentage: 100, isMainLandlord: true },
+        create: {
+          workspaceId: requireWorkspaceId(),
+          propertyId: id,
+          ownerId: id,
+          ownershipPercentage: 100,
+          isMainLandlord: true,
+        },
+      });
     });
   }
   console.log(`Seeded ${properties.length} properties`);

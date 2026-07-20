@@ -104,6 +104,8 @@ model Workspace {
   contractorReviews  ContractorReview[]
   notifications      Notification[]
   jobs               Job[]
+  owners             Owner[]
+  propertyOwnerships PropertyOwnership[]
 
   @@map("workspaces")
 }
@@ -136,10 +138,6 @@ model Property {
   propertyType       String   @map("property_type")
   bedrooms           Int?
   purchasePriceCents Int?     @map("purchase_price_cents")
-  landlordName       String?  @map("landlord_name")
-  landlordAddress    String?  @map("landlord_address")
-  landlordPhone      String?  @map("landlord_phone")
-  landlordEmail      String?  @map("landlord_email") @db.Citext
   notes              String?
   status             String   @default("active")
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -148,12 +146,54 @@ model Property {
   tenancies       Tenancy[]
   transactions    Transaction[]
   complianceItems ComplianceItem[]
-  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ownerships      PropertyOwnership[]
+  workspace       Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([id, workspaceId], map: "uq_properties_id_workspace")
   @@index([status], map: "idx_properties_status")
   @@index([workspaceId, createdAt(sort: Desc)], map: "idx_properties_workspace")
   @@map("properties")
+}
+
+// ---- 0017_shared_property_ownership ----
+
+model Owner {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  fullName    String   @map("full_name")
+  address     String
+  phone       String?
+  email       String?  @db.Citext
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace  Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  ownerships PropertyOwnership[]
+
+  @@unique([id, workspaceId], map: "uq_owners_id_workspace")
+  @@index([workspaceId, fullName], map: "idx_owners_workspace_name")
+  @@map("owners")
+}
+
+model PropertyOwnership {
+  id                  String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId         String   @map("workspace_id") @db.Uuid
+  propertyId          String   @map("property_id") @db.Uuid
+  ownerId             String   @map("owner_id") @db.Uuid
+  ownershipPercentage Decimal  @map("ownership_percentage") @db.Decimal(5, 2)
+  isMainLandlord      Boolean  @default(false) @map("is_main_landlord")
+  createdAt           DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt           DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  property  Property  @relation(fields: [propertyId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  owner     Owner     @relation(fields: [ownerId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+
+  @@unique([propertyId, ownerId], map: "uq_property_ownerships_property_owner")
+  @@unique([id, workspaceId], map: "uq_property_ownerships_id_workspace")
+  @@index([workspaceId, propertyId], map: "idx_property_ownerships_workspace_property")
+  @@index([workspaceId, ownerId], map: "idx_property_ownerships_workspace_owner")
+  @@map("property_ownerships")
 }
 
 // ---- 0003_tenants_tenancies ----

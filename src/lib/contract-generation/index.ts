@@ -4,6 +4,7 @@ import { conflict, notFound } from "@/lib/api/errors";
 import { prisma, requireWorkspaceId } from "@/lib/db";
 import { enqueueJob, registerJobHandler } from "@/lib/jobs";
 import { getOwner, notify } from "@/lib/notify";
+import { findMainLandlord } from "@/lib/property-ownership";
 import { uploadToStorage } from "@/lib/storage";
 import { buildGeneratedLeaseFilename } from "./filename";
 import { renderLeasePdf } from "./render";
@@ -52,17 +53,25 @@ async function handleContractGenerate(job: Job) {
   const actor = requestedBy ?? (await getOwner());
   const tenancy = await prisma.tenancy.findUnique({
     where: { id: payload.tenancyId },
-    include: { property: true, tenant: true },
+    include: {
+      property: {
+        include: {
+          ownerships: { where: { isMainLandlord: true }, include: { owner: true } },
+        },
+      },
+      tenant: true,
+    },
   });
   if (!tenancy) throw new Error("contract.generate: tenancy not found");
+  const mainLandlord = findMainLandlord(tenancy.property.ownerships);
 
   // 2–3. BUILD + VALIDATE (fails loudly on any missing field)
   const viewModel = buildLeaseViewModel({
     landlord: {
-      fullName: tenancy.property.landlordName ?? "",
-      address: tenancy.property.landlordAddress ?? "",
-      phone: tenancy.property.landlordPhone,
-      email: tenancy.property.landlordEmail,
+      fullName: mainLandlord?.fullName ?? "",
+      address: mainLandlord?.address ?? "",
+      phone: mainLandlord?.phone ?? null,
+      email: mainLandlord?.email ?? null,
     },
     property: tenancy.property,
     tenancy,

@@ -7,6 +7,7 @@ import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { patchPropertySchema } from "@/lib/schemas/property";
 import { serializeProperty } from "@/lib/serializers";
+import { ownershipInclude, replacePropertyOwnerships } from "@/lib/property-ownership";
 
 const paramsSchema = z.object({ id: z.uuid() });
 
@@ -16,7 +17,7 @@ export const GET = apiHandler<{ id: string }>(async (_req, { params }) => {
   // Header mini-stats (PLAN.md §4 wireframe 1).
   const yearStart = new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1));
   const [property, activeTenancy, ytd, nextItem] = await Promise.all([
-    prisma.property.findUnique({ where: { id } }),
+    prisma.property.findUnique({ where: { id }, include: ownershipInclude }),
     prisma.tenancy.findFirst({ where: { propertyId: id, status: "active" } }),
     prisma.transaction.aggregate({
       _sum: { amountCents: true },
@@ -43,6 +44,13 @@ export const PATCH = apiHandler<{ id: string }>(async (req, { params }) => {
   const body = await parseBody(req, patchPropertySchema);
   const existing = await prisma.property.findUnique({ where: { id } });
   if (!existing) throw notFound("Property");
-  const property = await prisma.property.update({ where: { id }, data: body });
+  const { ownership, ...propertyData } = body;
+  const property = await prisma.$transaction(async (tx) => {
+    if (Object.keys(propertyData).length > 0) {
+      await tx.property.update({ where: { id }, data: propertyData });
+    }
+    if (ownership) await replacePropertyOwnerships(tx, id, ownership);
+    return tx.property.findUniqueOrThrow({ where: { id }, include: ownershipInclude });
+  });
   return ok(serializeProperty(property));
 });

@@ -30,6 +30,16 @@ test("business creates and updates cannot choose another workspace", () => {
   assert.equal(update.data.workspaceId, A);
 });
 
+test("owners and ownership allocations are workspace scoped", () => {
+  const ownerArgs = { where: { fullName: "Owner", workspaceId: B } };
+  scopeWorkspaceArgs("Owner", "findMany", ownerArgs, A);
+  assert.equal(ownerArgs.where.workspaceId, A);
+
+  const ownershipArgs = { where: { propertyId: "property", workspaceId: B } };
+  scopeWorkspaceArgs("PropertyOwnership", "findMany", ownershipArgs, A);
+  assert.equal(ownershipArgs.where.workspaceId, A);
+});
+
 test("identity and membership models are only scoped explicitly", () => {
   const args = { where: { id: "user" } };
   scopeWorkspaceArgs("User", "findUnique", args, A);

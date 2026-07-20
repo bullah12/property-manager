@@ -8,6 +8,7 @@ import { requireAdmin } from "@/lib/auth";
 import { prisma, requireWorkspaceId } from "@/lib/db";
 import { createPropertySchema, PROPERTY_TYPES } from "@/lib/schemas/property";
 import { serializeProperty } from "@/lib/serializers";
+import { ownershipInclude, replacePropertyOwnerships } from "@/lib/property-ownership";
 
 const listQuery = paginationQuery.extend({
   status: z.enum(["active", "archived"]).optional(),
@@ -36,6 +37,7 @@ export const GET = apiHandler(async (req) => {
     prisma.property.count({ where }),
     prisma.property.findMany({
       where,
+      include: ownershipInclude,
       orderBy,
       skip: (q.page - 1) * q.perPage,
       take: q.perPage,
@@ -48,8 +50,13 @@ export const GET = apiHandler(async (req) => {
 export const POST = apiHandler(async (req) => {
   await requireAdmin();
   const body = await parseBody(req, createPropertySchema);
-  const property = await prisma.property.create({
-    data: { ...body, workspaceId: requireWorkspaceId() },
+  const { ownership, ...propertyData } = body;
+  const property = await prisma.$transaction(async (tx) => {
+    const created = await tx.property.create({
+      data: { ...propertyData, workspaceId: requireWorkspaceId() },
+    });
+    await replacePropertyOwnerships(tx, created.id, ownership);
+    return tx.property.findUniqueOrThrow({ where: { id: created.id }, include: ownershipInclude });
   });
   return ok(serializeProperty(property), 201);
 });

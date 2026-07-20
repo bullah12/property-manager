@@ -6,6 +6,7 @@ import { parse } from "@/lib/api/validate";
 import { requireAdmin } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { serializeProperty } from "@/lib/serializers";
+import { ownershipInclude } from "@/lib/property-ownership";
 
 const paramsSchema = z.object({ id: z.uuid() });
 
@@ -21,6 +22,7 @@ export const POST = apiHandler<{ id: string }>(async (_req, { params }) => {
   const updated = await prisma.property.update({
     where: { id },
     data: { status: "active" },
+    include: ownershipInclude,
   });
   return ok(serializeProperty(updated));
 });

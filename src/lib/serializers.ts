@@ -6,7 +6,9 @@ import type {
   File,
   Job,
   Notification,
+  Owner,
   Property,
+  PropertyOwnership,
   Reminder,
   Tenancy,
   Tenant,
@@ -33,7 +35,28 @@ export function serializeUser(user: User) {
   };
 }
 
-export function serializeProperty(p: Property) {
+type PropertyWithOwnerships = Property & {
+  ownerships: (PropertyOwnership & { owner: Owner })[];
+};
+
+export function serializePropertyOwnership(row: PropertyOwnership & { owner: Owner }) {
+  return {
+    id: row.id,
+    ownerId: row.ownerId,
+    fullName: row.owner.fullName,
+    address: row.owner.address,
+    phone: row.owner.phone,
+    email: row.owner.email,
+    ownershipPercentage: Number(row.ownershipPercentage),
+    isMainLandlord: row.isMainLandlord,
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  };
+}
+
+export function serializeProperty(p: PropertyWithOwnerships) {
+  const ownerships = p.ownerships.map(serializePropertyOwnership);
+  const mainLandlord = ownerships.find((owner) => owner.isMainLandlord) ?? null;
   return {
     id: p.id,
     nickname: p.nickname,
@@ -44,10 +67,9 @@ export function serializeProperty(p: Property) {
     propertyType: p.propertyType,
     bedrooms: p.bedrooms,
     purchasePriceCents: p.purchasePriceCents,
-    landlordName: p.landlordName,
-    landlordAddress: p.landlordAddress,
-    landlordPhone: p.landlordPhone,
-    landlordEmail: p.landlordEmail,
+    ownershipMode: ownerships.length === 1 ? "sole" : "shared",
+    ownerships,
+    mainLandlord,
     currency: CURRENCY,
     notes: p.notes,
     status: p.status,

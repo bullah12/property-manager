@@ -27,6 +27,15 @@ contractors, notifications and background jobs are all scoped to that
 portfolio. Workspace owners can link another existing account from Settings;
 linked accounts can switch portfolios there without combining their data.
 
+## Property ownership
+
+Legal owners are workspace-scoped records linked to properties through an
+ownership allocation. Each property has one or more owners, percentages that
+total exactly 100%, and exactly one main landlord used by agreements and other
+single-landlord workflows. The allocation is intentionally a join model so a
+future contribution ledger can attach capital events to both the property and
+the relevant owner without redesigning ownership.
+
 After pulling the workspace-isolation change, apply the forward-only migration
 before starting the application:
 

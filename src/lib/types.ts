@@ -63,13 +63,25 @@ export interface PropertyDto {
   propertyType: "house" | "flat" | "hmo" | "commercial";
   bedrooms: number | null;
   purchasePriceCents: number | null;
-  landlordName: string | null;
-  landlordAddress: string | null;
-  landlordPhone: string | null;
-  landlordEmail: string | null;
+  ownershipMode: "sole" | "shared";
+  ownerships: PropertyOwnershipDto[];
+  mainLandlord: PropertyOwnershipDto | null;
   currency: string;
   notes: string | null;
   status: "active" | "archived";
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface PropertyOwnershipDto {
+  id: string;
+  ownerId: string;
+  fullName: string;
+  address: string;
+  phone: string | null;
+  email: string | null;
+  ownershipPercentage: number;
+  isMainLandlord: boolean;
   createdAt: string;
   updatedAt: string;
 }

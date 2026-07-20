@@ -11,6 +11,8 @@ const WORKSPACE_MODELS = new Set([
   "File",
   "Contract",
   "Property",
+  "Owner",
+  "PropertyOwnership",
   "Tenant",
   "Tenancy",
   "Transaction",
