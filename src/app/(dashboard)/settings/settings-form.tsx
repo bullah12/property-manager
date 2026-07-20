@@ -38,8 +38,6 @@ const formSchema = z.object({
     .regex(/^\d+$/, "Whole number of days")
     .refine((v) => parseInt(v, 10) <= 60, "Max 60 days"),
   emailEnabled: z.boolean(),
-  landlordAddress: z.string().trim().max(500),
-  landlordPhone: z.string().trim().max(50),
   clausePetsDefault: z.boolean(),
   clauseGardenDefault: z.boolean(),
 });
@@ -57,8 +55,6 @@ export function SettingsForm({ me }: { me: MeDto }) {
       defaultLeadDays: me.settings.defaultLeadDays.join(", "),
       rentOverdueGraceDays: String(me.settings.rentOverdueGraceDays),
       emailEnabled: me.settings.emailEnabled,
-      landlordAddress: me.settings.landlordAddress ?? "",
-      landlordPhone: me.settings.landlordPhone ?? "",
       clausePetsDefault: me.settings.clausePetsDefault,
       clauseGardenDefault: me.settings.clauseGardenDefault,
     },
@@ -76,8 +72,6 @@ export function SettingsForm({ me }: { me: MeDto }) {
           defaultLeadDays: leadDays,
           rentOverdueGraceDays: parseInt(values.rentOverdueGraceDays, 10),
           emailEnabled: values.emailEnabled,
-          landlordAddress: values.landlordAddress || null,
-          landlordPhone: values.landlordPhone || null,
           clausePetsDefault: values.clausePetsDefault,
           clauseGardenDefault: values.clauseGardenDefault,
         })
@@ -91,8 +85,6 @@ export function SettingsForm({ me }: { me: MeDto }) {
         defaultLeadDays: data.settings.defaultLeadDays.join(", "),
         rentOverdueGraceDays: String(data.settings.rentOverdueGraceDays),
         emailEnabled: data.settings.emailEnabled,
-        landlordAddress: data.settings.landlordAddress ?? "",
-        landlordPhone: data.settings.landlordPhone ?? "",
         clausePetsDefault: data.settings.clausePetsDefault,
         clauseGardenDefault: data.settings.clauseGardenDefault,
       });
@@ -145,39 +137,6 @@ export function SettingsForm({ me }: { me: MeDto }) {
                   </FormControl>
                   <FormDescription>
                     IANA timezone driving all due-date evaluation.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="landlordAddress"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Legacy landlord correspondence address</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="25 Aiskew Grove, Stockton-on-Tees TS19 7QS, UK" />
-                  </FormControl>
-                  <FormDescription>
-                    Retained for older records. New agreements use the address saved on
-                    the property.
-                  </FormDescription>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-            <FormField
-              control={form.control}
-              name="landlordPhone"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Legacy landlord phone</FormLabel>
-                  <FormControl>
-                    <Input {...field} placeholder="07847 617821" />
-                  </FormControl>
-                  <FormDescription>
-                    Retained for older records. New agreements use the property landlord.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

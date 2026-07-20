@@ -15,8 +15,6 @@ export interface SettingsDto {
   defaultLeadDays: number[];
   rentOverdueGraceDays: number;
   emailEnabled: boolean;
-  landlordAddress: string | null;
-  landlordPhone: string | null;
   clausePetsDefault: boolean;
   clauseGardenDefault: boolean;
   updatedAt: string;

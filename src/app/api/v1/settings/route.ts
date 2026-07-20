@@ -17,8 +17,6 @@ const patchSettingsSchema = z
       .refine((a) => new Set(a).size === a.length, "lead days must be unique"),
     rentOverdueGraceDays: z.number().int().min(0).max(60),
     emailEnabled: z.boolean(),
-    landlordAddress: z.string().trim().max(500).nullable(),
-    landlordPhone: z.string().trim().max(50).nullable(),
     clausePetsDefault: z.boolean(),
     clauseGardenDefault: z.boolean(),
   })

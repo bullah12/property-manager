@@ -261,8 +261,6 @@ model UserSettings {
   defaultLeadDays      Int[]    @default([60, 30, 7]) @map("default_lead_days")
   rentOverdueGraceDays Int      @default(3) @map("rent_overdue_grace_days")
   emailEnabled         Boolean  @default(true) @map("email_enabled")
-  landlordAddress      String?  @map("landlord_address")
-  landlordPhone        String?  @map("landlord_phone")
   clausePetsDefault    Boolean  @default(false) @map("clause_pets_default")
   clauseGardenDefault  Boolean  @default(false) @map("clause_garden_default")
   createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)

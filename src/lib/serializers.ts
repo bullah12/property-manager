@@ -270,8 +270,6 @@ export function serializeSettings(s: UserSettings) {
     defaultLeadDays: s.defaultLeadDays,
     rentOverdueGraceDays: s.rentOverdueGraceDays,
     emailEnabled: s.emailEnabled,
-    landlordAddress: s.landlordAddress,
-    landlordPhone: s.landlordPhone,
     clausePetsDefault: s.clausePetsDefault,
     clauseGardenDefault: s.clauseGardenDefault,
     updatedAt: s.updatedAt.toISOString(),
