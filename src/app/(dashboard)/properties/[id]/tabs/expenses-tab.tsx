@@ -47,7 +47,7 @@ import {
 import { Textarea } from "@/components/ui/textarea";
 import { api, ApiClientError, uploadFile } from "@/lib/api-client";
 import { toDateOnly } from "@/lib/dates";
-import type { PropertyDetailDto, TransactionDto } from "@/lib/types";
+import type { TransactionDto } from "@/lib/types";
 
 const CATEGORIES = [
   "repairs",
@@ -75,7 +75,7 @@ function categoryLabel(c: string) {
   return c.replace(/_/g, " ");
 }
 
-export function ExpensesTab({ property }: { property: PropertyDetailDto }) {
+export function ExpensesTab({ propertyId }: { propertyId: string }) {
   const queryClient = useQueryClient();
   const currentYear = new Date().getUTCFullYear();
   const [year, setYear] = useState(String(currentYear));
@@ -84,7 +84,7 @@ export function ExpensesTab({ property }: { property: PropertyDetailDto }) {
   const [deleteTarget, setDeleteTarget] = useState<TransactionDto | null>(null);
 
   const apiQuery = new URLSearchParams({
-    propertyId: property.id,
+    propertyId,
     direction: "expense",
     year,
     perPage: "100",
@@ -92,14 +92,15 @@ export function ExpensesTab({ property }: { property: PropertyDetailDto }) {
   if (category !== "all") apiQuery.set("category", category);
 
   const query = useQuery({
-    queryKey: ["transactions", property.id, "expenses", year, category],
+    queryKey: ["transactions", propertyId, "expenses", year, category],
     queryFn: async () =>
       (await api.get<TransactionDto[]>(`/api/v1/transactions?${apiQuery.toString()}`)).data,
+    staleTime: 30_000,
   });
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ["transactions", property.id] });
-    queryClient.invalidateQueries({ queryKey: ["property", property.id] });
+    queryClient.invalidateQueries({ queryKey: ["transactions", propertyId] });
+    queryClient.invalidateQueries({ queryKey: ["property", propertyId] });
   };
 
   const deleteMutation = useMutation({
@@ -167,7 +168,7 @@ export function ExpensesTab({ property }: { property: PropertyDetailDto }) {
           variant="outline"
           onClick={() =>
             window.open(
-              `/api/v1/reports/expenses?year=${year}&format=csv&propertyId=${property.id}`,
+              `/api/v1/reports/expenses?year=${year}&format=csv&propertyId=${propertyId}`,
               "_blank"
             )
           }
@@ -181,7 +182,7 @@ export function ExpensesTab({ property }: { property: PropertyDetailDto }) {
 
       {showForm ? (
         <AddExpenseForm
-          propertyId={property.id}
+          propertyId={propertyId}
           onDone={() => {
             setShowForm(false);
             invalidate();

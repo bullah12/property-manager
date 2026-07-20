@@ -37,16 +37,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { api, ApiClientError } from "@/lib/api-client";
-import type { PropertyDetailDto, TenancyDto } from "@/lib/types";
+import type { TenancyDto } from "@/lib/types";
 
-export function TenancyTab({ property }: { property: PropertyDetailDto }) {
+export function TenancyTab({ propertyId }: { propertyId: string }) {
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: ["tenancies", { propertyId: property.id }],
+    queryKey: ["tenancies", { propertyId }],
     queryFn: async () =>
-      (await api.get<TenancyDto[]>(`/api/v1/tenancies?propertyId=${property.id}&perPage=100`))
+      (await api.get<TenancyDto[]>(`/api/v1/tenancies?propertyId=${propertyId}&perPage=100`))
         .data,
+    staleTime: 30_000,
   });
 
   const [overrideTarget, setOverrideTarget] = useState<string | null>(null);
@@ -69,7 +70,7 @@ export function TenancyTab({ property }: { property: PropertyDetailDto }) {
       ).data,
     onSuccess: (data, { action }) => {
       queryClient.invalidateQueries({ queryKey: ["tenancies"] });
-      queryClient.invalidateQueries({ queryKey: ["property", property.id] });
+      queryClient.invalidateQueries({ queryKey: ["property", propertyId] });
       toast.success(action === "activate" ? "Tenancy activated" : "Tenancy ended");
     },
     onError: (err, { id, action }) => {
@@ -205,7 +206,7 @@ export function TenancyTab({ property }: { property: PropertyDetailDto }) {
               No current tenancy — this property is vacant.
             </p>
             <Button asChild size="sm">
-              <Link href={`/tenancies/new?propertyId=${property.id}`}>
+              <Link href={`/tenancies/new?propertyId=${propertyId}`}>
                 <Plus className="size-4" /> New tenancy
               </Link>
             </Button>

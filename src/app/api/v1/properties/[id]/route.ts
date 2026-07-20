@@ -13,12 +13,10 @@ const paramsSchema = z.object({ id: z.uuid() });
 export const GET = apiHandler<{ id: string }>(async (_req, { params }) => {
   await requireAdmin();
   const { id } = parse(paramsSchema, params);
-  const property = await prisma.property.findUnique({ where: { id } });
-  if (!property) throw notFound("Property");
-
   // Header mini-stats (PLAN.md §4 wireframe 1).
   const yearStart = new Date(Date.UTC(new Date().getUTCFullYear(), 0, 1));
-  const [activeTenancy, ytd, nextItem] = await Promise.all([
+  const [property, activeTenancy, ytd, nextItem] = await Promise.all([
+    prisma.property.findUnique({ where: { id } }),
     prisma.tenancy.findFirst({ where: { propertyId: id, status: "active" } }),
     prisma.transaction.aggregate({
       _sum: { amountCents: true },
@@ -29,6 +27,7 @@ export const GET = apiHandler<{ id: string }>(async (_req, { params }) => {
       orderBy: { dueOn: "asc" },
     }),
   ]);
+  if (!property) throw notFound("Property");
   const stats = {
     currentRentCents: activeTenancy?.rentAmountCents ?? null,
     nextDeadline: nextItem ? nextItem.dueOn.toISOString().slice(0, 10) : null,

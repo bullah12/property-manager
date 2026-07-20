@@ -35,7 +35,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { api, ApiClientError } from "@/lib/api-client";
 import { toDateOnly } from "@/lib/dates";
 import { cn } from "@/lib/utils";
-import type { PropertyDetailDto } from "@/lib/types";
 
 const MONTH_LABELS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
 
@@ -84,15 +83,16 @@ const CELL_STYLES: Record<IncomeCellDto["status"], string> = {
   upcoming: "bg-muted/40 border-border text-muted-foreground",
 };
 
-export function IncomeTab({ property }: { property: PropertyDetailDto }) {
+export function IncomeTab({ propertyId }: { propertyId: string }) {
   const currentYear = new Date().getUTCFullYear();
   const [year, setYear] = useState(String(currentYear));
 
   const query = useQuery({
-    queryKey: ["income", property.id, year],
+    queryKey: ["income", propertyId, year],
     queryFn: async () =>
-      (await api.get<IncomeGridDto>(`/api/v1/properties/${property.id}/income?year=${year}`))
+      (await api.get<IncomeGridDto>(`/api/v1/properties/${propertyId}/income?year=${year}`))
         .data,
+    staleTime: 30_000,
   });
 
   const years = Array.from({ length: 6 }, (_, i) => String(currentYear - i));
@@ -199,7 +199,7 @@ export function IncomeTab({ property }: { property: PropertyDetailDto }) {
                         {cell ? (
                           <IncomeCellButton
                             cell={cell}
-                            propertyId={property.id}
+                            propertyId={propertyId}
                             tenancyId={row.tenancy.id}
                             year={grid.year}
                           />

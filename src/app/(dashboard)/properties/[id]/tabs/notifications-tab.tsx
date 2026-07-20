@@ -13,7 +13,7 @@ import {
   Trash2,
   Zap,
 } from "lucide-react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { DateDisplay } from "@/components/date-display";
@@ -55,7 +55,7 @@ import {
 } from "@/components/ui/table";
 import { api, ApiClientError, uploadFile } from "@/lib/api-client";
 import { toDateOnly } from "@/lib/dates";
-import type { ComplianceItemDto, ComplianceKind, PropertyDetailDto } from "@/lib/types";
+import type { ComplianceItemDto, ComplianceKind } from "@/lib/types";
 
 const KIND_META: Record<ComplianceKind, { label: string; icon: React.ReactNode; recurrence: number | null }> = {
   gas_certificate: { label: "Gas certificate", icon: <Flame className="size-4" />, recurrence: 12 },
@@ -78,9 +78,14 @@ function chipFor(item: ComplianceItemDto, today: string): string {
   return "ok";
 }
 
-export function NotificationsTab({ property }: { property: PropertyDetailDto }) {
+export function NotificationsTab({
+  propertyId,
+  propertyNickname,
+}: {
+  propertyId: string;
+  propertyNickname?: string;
+}) {
   const queryClient = useQueryClient();
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [addOpen, setAddOpen] = useState(false);
@@ -92,23 +97,27 @@ export function NotificationsTab({ property }: { property: PropertyDetailDto }) 
   useEffect(() => {
     if (searchParams.get("setup") === "1") {
       setSetupOpen(true);
-      router.replace(`${pathname}?tab=notifications`);
+      const next = new URLSearchParams(searchParams.toString());
+      next.delete("setup");
+      next.set("tab", "notifications");
+      window.history.replaceState(null, "", `${pathname}?${next.toString()}`);
     }
-  }, [searchParams, router, pathname]);
+  }, [searchParams, pathname]);
 
   const query = useQuery({
-    queryKey: ["compliance", property.id],
+    queryKey: ["compliance", propertyId],
     queryFn: async () =>
       (
         await api.get<{ today: string; items: ComplianceItemDto[] }>(
-          `/api/v1/properties/${property.id}/compliance`
+          `/api/v1/properties/${propertyId}/compliance`
         )
       ).data,
+    staleTime: 30_000,
   });
 
   const invalidate = () => {
-    queryClient.invalidateQueries({ queryKey: ["compliance", property.id] });
-    queryClient.invalidateQueries({ queryKey: ["property", property.id] });
+    queryClient.invalidateQueries({ queryKey: ["compliance", propertyId] });
+    queryClient.invalidateQueries({ queryKey: ["property", propertyId] });
   };
 
   const deleteMutation = useMutation({
@@ -262,14 +271,14 @@ export function NotificationsTab({ property }: { property: PropertyDetailDto }) 
       <AddItemDialog
         open={addOpen}
         onOpenChange={setAddOpen}
-        propertyId={property.id}
+        propertyId={propertyId}
         onDone={invalidate}
       />
       <UkDefaultsDialog
         open={setupOpen}
         onOpenChange={setSetupOpen}
-        propertyId={property.id}
-        propertyNickname={property.nickname}
+        propertyId={propertyId}
+        propertyNickname={propertyNickname ?? "this property"}
         onDone={invalidate}
       />
       <CompleteDialog

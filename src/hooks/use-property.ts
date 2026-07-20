@@ -8,5 +8,6 @@ export function useProperty(id: string) {
   return useQuery({
     queryKey: ["property", id],
     queryFn: async () => (await api.get<PropertyDetailDto>(`/api/v1/properties/${id}`)).data,
+    staleTime: 30_000,
   });
 }

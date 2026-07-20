@@ -45,9 +45,9 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { api, ApiClientError, uploadFile } from "@/lib/api-client";
 import { toDateOnly } from "@/lib/dates";
 import { useMe } from "@/hooks/use-me";
-import type { ContractDto, JobDto, PropertyDetailDto, TenancyDto } from "@/lib/types";
+import type { ContractDto, JobDto, TenancyDto } from "@/lib/types";
 
-export function ContractsTab({ property }: { property: PropertyDetailDto }) {
+export function ContractsTab({ propertyId }: { propertyId: string }) {
   const queryClient = useQueryClient();
   const [uploadOpen, setUploadOpen] = useState(false);
   const [generateOpen, setGenerateOpen] = useState(false);
@@ -55,10 +55,10 @@ export function ContractsTab({ property }: { property: PropertyDetailDto }) {
   const [signTarget, setSignTarget] = useState<ContractDto | null>(null);
 
   const query = useQuery({
-    queryKey: ["contracts", { propertyId: property.id }],
+    queryKey: ["contracts", { propertyId }],
     queryFn: async () => {
       const tenancies = (
-        await api.get<TenancyDto[]>(`/api/v1/tenancies?propertyId=${property.id}&perPage=100`)
+        await api.get<TenancyDto[]>(`/api/v1/tenancies?propertyId=${propertyId}&perPage=100`)
       ).data;
       const perTenancy = await Promise.all(
         tenancies.map(
@@ -79,10 +79,11 @@ export function ContractsTab({ property }: { property: PropertyDetailDto }) {
     },
     // Poll while a generation job is in flight ("Generating…" row).
     refetchInterval: generating ? 1500 : false,
+    staleTime: generating ? 0 : 30_000,
   });
 
   const invalidate = () =>
-    queryClient.invalidateQueries({ queryKey: ["contracts", { propertyId: property.id }] });
+    queryClient.invalidateQueries({ queryKey: ["contracts", { propertyId }] });
 
   if (generating && query.data && query.data.inFlight === 0) {
     setGenerating(false);

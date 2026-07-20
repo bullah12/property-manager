@@ -2,8 +2,9 @@
 
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Archive, ArchiveRestore, MoreHorizontal, Pencil, Plus } from "lucide-react";
+import dynamic from "next/dynamic";
 import Link from "next/link";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
 import { DateDisplay } from "@/components/date-display";
 import { Money } from "@/components/money";
@@ -31,17 +32,36 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { useProperty } from "@/hooks/use-property";
 import { api, ApiClientError } from "@/lib/api-client";
 import type { PropertyDetailDto } from "@/lib/types";
-import { ContractsTab } from "./tabs/contracts-tab";
-import { ExpensesTab } from "./tabs/expenses-tab";
-import { IncomeTab } from "./tabs/income-tab";
-import { NotificationsTab } from "./tabs/notifications-tab";
-import { TenancyTab } from "./tabs/tenancy-tab";
+
+function TabLoadingSkeleton() {
+  return <Skeleton className="h-64 w-full" />;
+}
+
+const TenancyTab = dynamic<{ propertyId: string }>(
+  () => import("./tabs/tenancy-tab").then((module) => module.TenancyTab),
+  { loading: TabLoadingSkeleton }
+);
+const ContractsTab = dynamic<{ propertyId: string }>(
+  () => import("./tabs/contracts-tab").then((module) => module.ContractsTab),
+  { loading: TabLoadingSkeleton }
+);
+const IncomeTab = dynamic<{ propertyId: string }>(
+  () => import("./tabs/income-tab").then((module) => module.IncomeTab),
+  { loading: TabLoadingSkeleton }
+);
+const ExpensesTab = dynamic<{ propertyId: string }>(
+  () => import("./tabs/expenses-tab").then((module) => module.ExpensesTab),
+  { loading: TabLoadingSkeleton }
+);
+const NotificationsTab = dynamic<{ propertyId: string; propertyNickname?: string }>(
+  () => import("./tabs/notifications-tab").then((module) => module.NotificationsTab),
+  { loading: TabLoadingSkeleton }
+);
 
 const TABS = ["contracts", "income", "expenses", "notifications", "tenancy"] as const;
 type TabKey = (typeof TABS)[number];
 
 export function PropertyDetail({ id }: { id: string }) {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const queryClient = useQueryClient();
@@ -62,29 +82,21 @@ export function PropertyDetail({ id }: { id: string }) {
       toast.error(err instanceof ApiClientError ? err.message : "Action failed"),
   });
 
-  if (isLoading) {
-    return (
-      <div className="space-y-4">
-        <Skeleton className="h-24 w-full max-w-2xl" />
-        <Skeleton className="h-64 w-full" />
-      </div>
-    );
-  }
-  if (isError || !property) {
-    return (
-      <div className="text-sm text-muted-foreground">
-        Failed to load property.{" "}
-        <button className="underline" onClick={() => refetch()}>
-          Retry
-        </button>
-      </div>
-    );
-  }
-
   return (
     <div className="space-y-6">
-      {/* Header band */}
-      <div className="flex flex-wrap items-start justify-between gap-4">
+      {isLoading ? (
+        <PropertySummarySkeleton />
+      ) : isError || !property ? (
+        <div className="rounded-lg border p-4 text-sm text-muted-foreground">
+          Property summary could not be loaded.{" "}
+          <button className="underline" onClick={() => refetch()}>
+            Retry
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* Header band */}
+          <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <div className="flex items-center gap-3">
             <h2 className="text-xl font-semibold">{property.nickname}</h2>
@@ -156,8 +168,8 @@ export function PropertyDetail({ id }: { id: string }) {
         </div>
       </div>
 
-      {/* Mini-stats */}
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          {/* Mini-stats */}
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
         <MiniStat
           label="Current rent"
           value={
@@ -185,12 +197,18 @@ export function PropertyDetail({ id }: { id: string }) {
           label="YTD expenses"
           value={<Money cents={property.stats.ytdExpensesCents} />}
         />
-      </div>
+          </div>
+        </>
+      )}
 
       {/* Tab strip (URL-addressable) */}
       <Tabs
         value={tab}
-        onValueChange={(v) => router.replace(`${pathname}?tab=${v}`)}
+        onValueChange={(value) => {
+          const next = new URLSearchParams(searchParams.toString());
+          next.set("tab", value);
+          window.history.replaceState(null, "", `${pathname}?${next.toString()}`);
+        }}
       >
         <TabsList className="flex-wrap">
           <TabsTrigger value="tenancy">Tenancy</TabsTrigger>
@@ -200,21 +218,41 @@ export function PropertyDetail({ id }: { id: string }) {
           <TabsTrigger value="notifications">Compliance</TabsTrigger>
         </TabsList>
         <TabsContent value="tenancy">
-          <TenancyTab property={property} />
+          <TenancyTab propertyId={id} />
         </TabsContent>
         <TabsContent value="contracts">
-          <ContractsTab property={property} />
+          <ContractsTab propertyId={id} />
         </TabsContent>
         <TabsContent value="income">
-          <IncomeTab property={property} />
+          <IncomeTab propertyId={id} />
         </TabsContent>
         <TabsContent value="expenses">
-          <ExpensesTab property={property} />
+          <ExpensesTab propertyId={id} />
         </TabsContent>
         <TabsContent value="notifications">
-          <NotificationsTab property={property} />
+          <NotificationsTab propertyId={id} propertyNickname={property?.nickname} />
         </TabsContent>
       </Tabs>
+    </div>
+  );
+}
+
+function PropertySummarySkeleton() {
+  return (
+    <div className="space-y-4" aria-label="Loading property summary">
+      <div className="flex items-start justify-between gap-4">
+        <div className="space-y-2">
+          <Skeleton className="h-7 w-56" />
+          <Skeleton className="h-4 w-80 max-w-full" />
+          <Skeleton className="h-4 w-64 max-w-full" />
+        </div>
+        <Skeleton className="h-9 w-40" />
+      </div>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        <Skeleton className="h-20" />
+        <Skeleton className="h-20" />
+        <Skeleton className="h-20" />
+      </div>
     </div>
   );
 }
