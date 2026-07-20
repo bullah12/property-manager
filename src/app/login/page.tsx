@@ -1,7 +1,7 @@
 "use client";
 
 import { Building } from "lucide-react";
-import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,9 +13,10 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { broadcastAuthChange } from "@/lib/auth-events";
 
 export default function LoginPage() {
-  const router = useRouter();
+  const queryClient = useQueryClient();
   const [mode, setMode] = useState<"login" | "signup">("login");
   const [displayName, setDisplayName] = useState("");
   const [email, setEmail] = useState("");
@@ -69,8 +70,10 @@ export default function LoginPage() {
         setSuccess("Account created. Check your email to confirm your address, then sign in.");
         return;
       }
-      router.push("/");
-      router.refresh();
+      await queryClient.cancelQueries();
+      queryClient.clear();
+      broadcastAuthChange();
+      window.location.replace("/");
     } finally {
       setSubmitting(false);
     }

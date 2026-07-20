@@ -44,6 +44,7 @@ export function apiHandler<P = Record<string, never>>(fn: RouteFn<P>) {
       }
     }
     res.headers.set("X-Request-Id", requestId);
+    res.headers.set("Cache-Control", "private, no-store, max-age=0");
     return res;
   };
 }

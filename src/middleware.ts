@@ -49,6 +49,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(url);
   }
 
+  response.headers.set("Cache-Control", "private, no-store, max-age=0");
   return response;
 }
 

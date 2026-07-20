@@ -2,7 +2,7 @@
 
 import { CircleUser, LogOut, Settings } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -14,15 +14,21 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useMe } from "@/hooks/use-me";
 import { api } from "@/lib/api-client";
+import { broadcastAuthChange } from "@/lib/auth-events";
 
 export function UserMenu() {
-  const router = useRouter();
+  const queryClient = useQueryClient();
   const { data: me } = useMe();
 
   async function logout() {
-    await api.post("/api/v1/auth/logout");
-    router.push("/login");
-    router.refresh();
+    await queryClient.cancelQueries();
+    queryClient.clear();
+    try {
+      await api.post("/api/v1/auth/logout");
+    } finally {
+      broadcastAuthChange();
+      window.location.replace("/login");
+    }
   }
 
   return (

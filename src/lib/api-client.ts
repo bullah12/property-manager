@@ -19,6 +19,8 @@ interface Envelope<T> {
 async function request<T>(path: string, init?: RequestInit): Promise<Envelope<T>> {
   const res = await fetch(path, {
     ...init,
+    cache: "no-store",
+    credentials: "same-origin",
     headers: {
       ...(init?.body ? { "Content-Type": "application/json" } : {}),
       ...init?.headers,
