@@ -11,3 +11,12 @@ export const POST = apiHandler(async () => {
   });
   return ok({ markedRead: result.count });
 });
+
+/** Permanently clear all read notifications for the signed-in user. */
+export const DELETE = apiHandler(async () => {
+  const { user } = await requireAdmin();
+  const result = await prisma.notification.deleteMany({
+    where: { userId: user.id, readAt: { not: null } },
+  });
+  return ok({ deleted: result.count });
+});

@@ -1,10 +1,21 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, CalendarClock, Check, CheckCheck } from "lucide-react";
+import { Bell, CalendarClock, Check, CheckCheck, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { toast } from "sonner";
 import { DateDisplay } from "@/components/date-display";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from "@/components/ui/alert-dialog";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
@@ -63,6 +74,31 @@ export function NotificationsScreen() {
     onError: (err) =>
       toast.error(err instanceof ApiClientError ? err.message : "Failed"),
   });
+  const removeNotification = useMutation({
+    mutationFn: async (id: string) =>
+      api.delete<{ deleted: true }>(`/api/v1/notifications/${id}`),
+    onSuccess: () => {
+      invalidate();
+      toast.success("Notification removed");
+    },
+    onError: (err) =>
+      toast.error(
+        err instanceof ApiClientError ? err.message : "Failed to remove notification"
+      ),
+  });
+  const clearRead = useMutation({
+    mutationFn: async () =>
+      api.delete<{ deleted: number }>("/api/v1/notifications/read-all"),
+    onSuccess: (res) => {
+      invalidate();
+      const count = res.data.deleted;
+      toast.success(`Removed ${count} read notification${count === 1 ? "" : "s"}`);
+    },
+    onError: (err) =>
+      toast.error(
+        err instanceof ApiClientError ? err.message : "Failed to clear notifications"
+      ),
+  });
 
   const notifications = inbox.data?.data ?? [];
   const unread = notifications.filter((n) => !n.readAt);
@@ -82,16 +118,46 @@ export function NotificationsScreen() {
                 overdue rent, contracts).
               </CardDescription>
             </div>
-            {unread.length > 0 ? (
-              <Button
-                variant="outline"
-                size="sm"
-                onClick={() => markAll.mutate()}
-                disabled={markAll.isPending}
-              >
-                <CheckCheck className="size-4" /> Mark all read
-              </Button>
-            ) : null}
+            <div className="flex flex-wrap items-center justify-end gap-2">
+              {read.length > 0 ? (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button variant="outline" size="sm">
+                      <Trash2 className="size-4" /> Clear read
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>Clear all read notifications?</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        This permanently removes every read notification in your
+                        notification history. Unread notifications are kept.
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>Cancel</AlertDialogCancel>
+                      <AlertDialogAction
+                        variant="destructive"
+                        disabled={clearRead.isPending}
+                        onClick={() => clearRead.mutate()}
+                      >
+                        Clear read
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              ) : null}
+              {unread.length > 0 ? (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => markAll.mutate()}
+                  disabled={markAll.isPending}
+                >
+                  <CheckCheck className="size-4" /> Mark all read
+                </Button>
+              ) : null}
+            </div>
           </div>
         </CardHeader>
         <CardContent>
@@ -125,7 +191,13 @@ export function NotificationsScreen() {
                   <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                     Earlier
                   </div>
-                  <NotificationList items={read} />
+                  <NotificationList
+                    items={read}
+                    onRemove={(id) => removeNotification.mutate(id)}
+                    removingId={
+                      removeNotification.isPending ? removeNotification.variables : undefined
+                    }
+                  />
                 </>
               ) : null}
             </div>
@@ -185,10 +257,14 @@ export function NotificationsScreen() {
 function NotificationList({
   items,
   onMarkRead,
+  onRemove,
+  removingId,
   unread = false,
 }: {
   items: NotificationDto[];
   onMarkRead?: (id: string) => void;
+  onRemove?: (id: string) => void;
+  removingId?: string;
   unread?: boolean;
 }) {
   return (
@@ -225,6 +301,32 @@ function NotificationList({
             >
               <Check className="size-4" />
             </Button>
+          ) : onRemove ? (
+            <AlertDialog>
+              <AlertDialogTrigger asChild>
+                <Button variant="ghost" size="sm" aria-label={`Remove ${n.title}`}>
+                  <Trash2 className="size-4" />
+                </Button>
+              </AlertDialogTrigger>
+              <AlertDialogContent>
+                <AlertDialogHeader>
+                  <AlertDialogTitle>Remove this notification?</AlertDialogTitle>
+                  <AlertDialogDescription>
+                    “{n.title}” will be permanently removed from your notification history.
+                  </AlertDialogDescription>
+                </AlertDialogHeader>
+                <AlertDialogFooter>
+                  <AlertDialogCancel>Cancel</AlertDialogCancel>
+                  <AlertDialogAction
+                    variant="destructive"
+                    disabled={removingId === n.id}
+                    onClick={() => onRemove(n.id)}
+                  >
+                    Remove
+                  </AlertDialogAction>
+                </AlertDialogFooter>
+              </AlertDialogContent>
+            </AlertDialog>
           ) : null}
         </li>
       ))}
