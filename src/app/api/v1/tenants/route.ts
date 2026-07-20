@@ -5,7 +5,7 @@ import { ok, okList, listMeta } from "@/lib/api/respond";
 import { parseSort } from "@/lib/api/sort";
 import { paginationQuery, parseBody, parseQuery } from "@/lib/api/validate";
 import { requireAdmin } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { prisma, requireWorkspaceId } from "@/lib/db";
 import { createTenantSchema } from "@/lib/schemas/tenancy";
 import { serializeTenant } from "@/lib/serializers";
 
@@ -61,6 +61,8 @@ export const GET = apiHandler(async (req) => {
 export const POST = apiHandler(async (req) => {
   await requireAdmin();
   const body = await parseBody(req, createTenantSchema);
-  const tenant = await prisma.tenant.create({ data: body });
+  const tenant = await prisma.tenant.create({
+    data: { ...body, workspaceId: requireWorkspaceId() },
+  });
   return ok(serializeTenant(tenant), 201);
 });

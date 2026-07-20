@@ -5,7 +5,7 @@ import { ok } from "@/lib/api/respond";
 import { parseBody } from "@/lib/api/validate";
 import { requireAdmin } from "@/lib/auth";
 import { COMPLIANCE_KINDS } from "@/lib/compliance";
-import { prisma } from "@/lib/db";
+import { prisma, requireWorkspaceId } from "@/lib/db";
 import { parseDateOnly } from "@/lib/dates";
 import { syncComplianceReminder } from "@/lib/reminders";
 import { dateOnly } from "@/lib/schemas/tenancy";
@@ -32,6 +32,7 @@ export const POST = apiHandler(async (req) => {
   const item = await prisma.$transaction(async (tx) => {
     const created = await tx.complianceItem.create({
       data: {
+        workspaceId: requireWorkspaceId(),
         propertyId: body.propertyId,
         kind: body.kind,
         label: body.label,

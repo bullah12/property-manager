@@ -1,7 +1,7 @@
 import { createHash, randomUUID } from "node:crypto";
 import type { Job, Prisma } from "@prisma/client";
 import { conflict, notFound } from "@/lib/api/errors";
-import { prisma } from "@/lib/db";
+import { prisma, requireWorkspaceId } from "@/lib/db";
 import { enqueueJob, registerJobHandler } from "@/lib/jobs";
 import { getOwner, notify } from "@/lib/notify";
 import { uploadToStorage } from "@/lib/storage";
@@ -79,6 +79,7 @@ async function handleContractGenerate(job: Job) {
   await uploadToStorage(storageKey, pdf, "application/pdf");
   const file = await prisma.file.create({
     data: {
+      workspaceId: requireWorkspaceId(),
       ownerId: actor.id,
       purpose: "generated-lease",
       storageKey,
@@ -94,6 +95,7 @@ async function handleContractGenerate(job: Job) {
   await prisma.$transaction(async (tx) => {
     const doc = await tx.generatedDocument.create({
       data: {
+        workspaceId: requireWorkspaceId(),
         docType: "lease",
         templateVersion: TEMPLATE_VERSION,
         subjectType: "tenancy",
@@ -104,6 +106,7 @@ async function handleContractGenerate(job: Job) {
     });
     await tx.contract.create({
       data: {
+        workspaceId: requireWorkspaceId(),
         tenancyId: tenancy.id,
         kind: payload.kind,
         source: "generated",

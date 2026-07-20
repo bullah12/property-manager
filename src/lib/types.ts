@@ -23,6 +23,27 @@ export interface SettingsDto {
 export interface MeDto {
   user: UserDto;
   settings: SettingsDto;
+  workspace: WorkspaceDto;
+}
+
+export interface WorkspaceDto {
+  id: string;
+  name: string;
+  role: string;
+}
+
+export interface WorkspaceListDto {
+  activeWorkspaceId: string;
+  workspaces: WorkspaceDto[];
+}
+
+export interface WorkspaceMemberDto {
+  userId: string;
+  email: string;
+  displayName: string;
+  role: string;
+  status: string;
+  joinedAt?: string;
 }
 
 export interface ListMetaDto {

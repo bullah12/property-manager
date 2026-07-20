@@ -1,6 +1,6 @@
 import { createHash, randomUUID } from "node:crypto";
 import { ApiError } from "@/lib/api/errors";
-import { prisma } from "@/lib/db";
+import { prisma, requireWorkspaceId } from "@/lib/db";
 import { uploadToStorage } from "@/lib/storage";
 
 /** Upload policies per purpose (PLAN.md §6). generated-lease is server-only. */
@@ -83,6 +83,7 @@ export async function storeUpload(opts: {
 
   const file = await prisma.file.create({
     data: {
+      workspaceId: requireWorkspaceId(),
       ownerId: opts.ownerId,
       purpose: opts.purpose,
       storageKey,

@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/db";
+import { currentWorkspaceId, prisma } from "@/lib/db";
 import { enqueueJob } from "@/lib/jobs";
 
 /**
@@ -31,11 +31,13 @@ export async function notify(
   type: string,
   input: NotifyInput
 ): Promise<string | null> {
+  const workspaceId = currentWorkspaceId();
+  if (!workspaceId) throw new Error("notify() requires a workspace context");
   const rows = await prisma.$queryRaw<{ id: string }[]>`
-    INSERT INTO notifications (user_id, type, title, body, link_path, dedupe_key)
-    VALUES (${userId}::uuid, ${type}, ${input.title}, ${input.body ?? null},
+    INSERT INTO notifications (workspace_id, user_id, type, title, body, link_path, dedupe_key)
+    VALUES (${workspaceId}::uuid, ${userId}::uuid, ${type}, ${input.title}, ${input.body ?? null},
             ${input.linkPath ?? null}, ${input.dedupeKey ?? null})
-    ON CONFLICT (dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING
+    ON CONFLICT (workspace_id, dedupe_key) WHERE dedupe_key IS NOT NULL DO NOTHING
     RETURNING id
   `;
   const id = rows[0]?.id ?? null;
@@ -50,13 +52,20 @@ export async function notify(
   return id;
 }
 
-/** Legacy-job fallback: use the earliest active admin when no requester was recorded. */
+/** Return the active owner/admin for the current workspace. */
 export async function getOwner() {
-  const owner = await prisma.user.findFirst({
-    where: { role: "admin", status: "active" },
-    orderBy: { createdAt: "asc" },
-    include: { settings: true },
+  const workspaceId = currentWorkspaceId();
+  if (!workspaceId) throw new Error("getOwner() requires a workspace context");
+  const membership = await prisma.workspaceMembership.findFirst({
+    where: {
+      workspaceId,
+      status: "active",
+      role: { in: ["owner", "admin"] },
+      user: { status: "active" },
+    },
+    orderBy: [{ role: "desc" }, { createdAt: "asc" }],
+    include: { user: { include: { settings: true } } },
   });
-  if (!owner) throw new Error("No active admin user found");
-  return owner;
+  if (!membership) throw new Error("No active workspace owner found");
+  return membership.user;
 }

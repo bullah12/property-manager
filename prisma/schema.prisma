@@ -15,6 +15,7 @@ datasource db {
 
 model File {
   id                 String              @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId        String              @map("workspace_id") @db.Uuid
   ownerId            String?             @map("owner_id") @db.Uuid
   purpose            String
   storageKey         String              @unique @map("storage_key")
@@ -27,17 +28,21 @@ model File {
   createdAt          DateTime            @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime            @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   owner              User?               @relation(fields: [ownerId], references: [id], onDelete: SetNull)
+  workspace          Workspace           @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   contracts          Contract[]
   transactions       Transaction[]
   complianceItems    ComplianceItem[]
   generatedDocuments GeneratedDocument[]
 
+  @@unique([id, workspaceId], map: "uq_files_id_workspace")
   @@index([ownerId], map: "idx_files_owner_id")
+  @@index([workspaceId, createdAt(sort: Desc)], map: "idx_files_workspace")
   @@map("files")
 }
 
 model Contract {
   id                  String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId         String             @map("workspace_id") @db.Uuid
   tenancyId           String             @map("tenancy_id") @db.Uuid
   kind                String
   source              String
@@ -50,34 +55,79 @@ model Contract {
   tenancy             Tenancy            @relation(fields: [tenancyId], references: [id], onDelete: Cascade)
   file                File               @relation(fields: [fileId], references: [id], onDelete: Restrict)
   generatedDocument   GeneratedDocument? @relation(fields: [generatedDocumentId], references: [id], onDelete: SetNull, map: "fk_contracts_generated_document_id")
+  workspace           Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([tenancyId], map: "idx_contracts_tenancy_id")
   @@index([fileId], map: "idx_contracts_file_id")
+  @@index([workspaceId, createdAt(sort: Desc)], map: "idx_contracts_workspace")
   @@map("contracts")
 }
 
 // ---- 0001_users_and_settings ----
 
 model User {
-  id            String         @id @db.Uuid
-  email         String         @unique @db.Citext
-  displayName   String         @map("display_name")
-  role          String         @default("admin")
-  status        String         @default("active")
-  timezone      String         @default("Europe/London")
-  createdAt     DateTime       @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt     DateTime       @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  settings      UserSettings?
-  files         File[]
-  notifications Notification[]
+  id                   String                @id @db.Uuid
+  email                String                @unique @db.Citext
+  displayName          String                @map("display_name")
+  role                 String                @default("admin")
+  status               String                @default("active")
+  timezone             String                @default("Europe/London")
+  createdAt            DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  settings             UserSettings?
+  files                File[]
+  notifications        Notification[]
+  workspaceMemberships WorkspaceMembership[]
 
   @@map("users")
+}
+
+// ---- 0016_workspaces_and_data_isolation ----
+
+model Workspace {
+  id                 String                @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  name               String
+  status             String                @default("active")
+  createdAt          DateTime              @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt          DateTime              @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  memberships        WorkspaceMembership[]
+  properties         Property[]
+  tenants            Tenant[]
+  tenancies          Tenancy[]
+  transactions       Transaction[]
+  complianceItems    ComplianceItem[]
+  reminders          Reminder[]
+  files              File[]
+  contracts          Contract[]
+  generatedDocuments GeneratedDocument[]
+  contractors        Contractor[]
+  contractorReviews  ContractorReview[]
+  notifications      Notification[]
+  jobs               Job[]
+
+  @@map("workspaces")
+}
+
+model WorkspaceMembership {
+  workspaceId String    @map("workspace_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  role        String    @default("member")
+  status      String    @default("active")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([workspaceId, userId])
+  @@index([userId, status], map: "idx_workspace_memberships_user")
+  @@map("workspace_memberships")
 }
 
 // ---- 0002_properties ----
 
 model Property {
   id                 String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId        String   @map("workspace_id") @db.Uuid
   nickname           String
   addressLine1       String   @map("address_line1")
   addressLine2       String?  @map("address_line2")
@@ -98,29 +148,37 @@ model Property {
   tenancies       Tenancy[]
   transactions    Transaction[]
   complianceItems ComplianceItem[]
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
+  @@unique([id, workspaceId], map: "uq_properties_id_workspace")
   @@index([status], map: "idx_properties_status")
+  @@index([workspaceId, createdAt(sort: Desc)], map: "idx_properties_workspace")
   @@map("properties")
 }
 
 // ---- 0003_tenants_tenancies ----
 
 model Tenant {
-  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  fullName  String    @map("full_name")
-  email     String?   @db.Citext
-  phone     String?
-  notes     String?
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
-  tenancies Tenancy[]
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  fullName    String    @map("full_name")
+  email       String?   @db.Citext
+  phone       String?
+  notes       String?
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  tenancies   Tenancy[]
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
+  @@unique([id, workspaceId], map: "uq_tenants_id_workspace")
   @@index([email], map: "idx_tenants_email")
+  @@index([workspaceId, createdAt(sort: Desc)], map: "idx_tenants_workspace")
   @@map("tenants")
 }
 
 model Tenancy {
   id                 String        @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId        String        @map("workspace_id") @db.Uuid
   propertyId         String        @map("property_id") @db.Uuid
   tenantId           String        @map("tenant_id") @db.Uuid
   startDate          DateTime      @map("start_date") @db.Date
@@ -138,9 +196,12 @@ model Tenancy {
   tenant             Tenant        @relation(fields: [tenantId], references: [id], onDelete: Restrict)
   contracts          Contract[]
   transactions       Transaction[]
+  workspace          Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
+  @@unique([id, workspaceId], map: "uq_tenancies_id_workspace")
   @@index([propertyId, status], map: "idx_tenancies_property_id_status")
   @@index([tenantId], map: "idx_tenancies_tenant_id")
+  @@index([workspaceId, createdAt(sort: Desc)], map: "idx_tenancies_workspace")
   @@map("tenancies")
 }
 
@@ -148,6 +209,7 @@ model Tenancy {
 
 model Transaction {
   id            String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId   String    @map("workspace_id") @db.Uuid
   propertyId    String    @map("property_id") @db.Uuid
   tenancyId     String?   @map("tenancy_id") @db.Uuid
   direction     String
@@ -162,10 +224,12 @@ model Transaction {
   property      Property  @relation(fields: [propertyId], references: [id], onDelete: Restrict)
   tenancy       Tenancy?  @relation(fields: [tenancyId], references: [id], onDelete: SetNull)
   receiptFile   File?     @relation(fields: [receiptFileId], references: [id], onDelete: SetNull)
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([propertyId, occurredOn(sort: Desc)], map: "idx_transactions_property_id_occurred_on")
   @@index([tenancyId, rentPeriod], map: "idx_transactions_tenancy_id_rent_period")
   @@index([receiptFileId], map: "idx_transactions_receipt_file_id")
+  @@index([workspaceId, occurredOn(sort: Desc)], map: "idx_transactions_workspace")
   @@map("transactions")
 }
 
@@ -173,6 +237,7 @@ model Transaction {
 
 model ComplianceItem {
   id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId      String    @map("workspace_id") @db.Uuid
   propertyId       String    @map("property_id") @db.Uuid
   kind             String
   label            String
@@ -184,56 +249,67 @@ model ComplianceItem {
   updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   property         Property  @relation(fields: [propertyId], references: [id], onDelete: Cascade)
   documentFile     File?     @relation(fields: [documentFileId], references: [id], onDelete: SetNull)
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([propertyId], map: "idx_compliance_items_property_id")
+  @@index([workspaceId, dueOn], map: "idx_compliance_items_workspace")
   @@map("compliance_items")
 }
 
 model Reminder {
-  id               String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  subjectType      String   @map("subject_type")
-  subjectId        String   @map("subject_id") @db.Uuid
-  dueOn            DateTime @map("due_on") @db.Date
-  leadDays         Int[]    @default([60, 30, 7]) @map("lead_days")
-  lastNotifiedLead Int?     @map("last_notified_lead")
-  createdAt        DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt        DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  id               String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId      String    @map("workspace_id") @db.Uuid
+  subjectType      String    @map("subject_type")
+  subjectId        String    @map("subject_id") @db.Uuid
+  dueOn            DateTime  @map("due_on") @db.Date
+  leadDays         Int[]     @default([60, 30, 7]) @map("lead_days")
+  lastNotifiedLead Int?      @map("last_notified_lead")
+  createdAt        DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspace        Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([subjectType, subjectId])
   @@index([dueOn], map: "idx_reminders_due_on")
+  @@index([workspaceId, dueOn], map: "idx_reminders_workspace")
   @@map("reminders")
 }
 
 // ---- 0007_notifications_and_jobs ----
 
 model Notification {
-  id        String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  userId    String    @map("user_id") @db.Uuid
-  type      String
-  title     String
-  body      String?
-  linkPath  String?   @map("link_path")
-  dedupeKey String?   @map("dedupe_key")
-  readAt    DateTime? @map("read_at") @db.Timestamptz(6)
-  createdAt DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
-  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
+  userId      String    @map("user_id") @db.Uuid
+  type        String
+  title       String
+  body        String?
+  linkPath    String?   @map("link_path")
+  dedupeKey   String?   @map("dedupe_key")
+  readAt      DateTime? @map("read_at") @db.Timestamptz(6)
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
+  @@index([workspaceId, createdAt(sort: Desc)], map: "idx_notifications_workspace")
   @@map("notifications")
 }
 
 model Job {
-  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String    @map("workspace_id") @db.Uuid
   type        String
-  payload     Json     @default("{}")
-  status      String   @default("pending")
-  runAt       DateTime @default(now()) @map("run_at") @db.Timestamptz(6)
-  attempts    Int      @default(0)
-  maxAttempts Int      @default(3) @map("max_attempts")
-  lastError   String?  @map("last_error")
-  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  payload     Json      @default("{}")
+  status      String    @default("pending")
+  runAt       DateTime  @default(now()) @map("run_at") @db.Timestamptz(6)
+  attempts    Int       @default(0)
+  maxAttempts Int       @default(3) @map("max_attempts")
+  lastError   String?   @map("last_error")
+  createdAt   DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime  @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([status, runAt], map: "idx_jobs_status_run_at")
+  @@index([workspaceId, status, runAt], map: "idx_jobs_workspace")
   @@map("jobs")
 }
 
@@ -241,6 +317,7 @@ model Job {
 
 model GeneratedDocument {
   id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId     String     @map("workspace_id") @db.Uuid
   docType         String     @map("doc_type")
   templateVersion String     @map("template_version")
   subjectType     String     @map("subject_type")
@@ -250,9 +327,12 @@ model GeneratedDocument {
   createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   file            File       @relation(fields: [fileId], references: [id], onDelete: Restrict)
   contracts       Contract[]
+  workspace       Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
+  @@unique([id, workspaceId], map: "uq_generated_documents_id_workspace")
   @@index([subjectType, subjectId], map: "idx_generated_documents_subject")
   @@index([fileId], map: "idx_generated_documents_file_id")
+  @@index([workspaceId, createdAt(sort: Desc)], map: "idx_generated_documents_workspace")
   @@map("generated_documents")
 }
 
@@ -274,6 +354,7 @@ model UserSettings {
 
 model Contractor {
   id                 String             @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId        String             @map("workspace_id") @db.Uuid
   businessName       String             @map("business_name")
   contactName        String?            @map("contact_name")
   trade              String
@@ -287,13 +368,17 @@ model Contractor {
   createdAt          DateTime           @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt          DateTime           @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   reviews            ContractorReview[]
+  workspace          Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
+  @@unique([id, workspaceId], map: "uq_contractors_id_workspace")
   @@index([status, trade], map: "idx_contractors_status_trade")
+  @@index([workspaceId, status, trade], map: "idx_contractors_workspace")
   @@map("contractors")
 }
 
 model ContractorReview {
   id              String     @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId     String     @map("workspace_id") @db.Uuid
   contractorId    String     @map("contractor_id") @db.Uuid
   rating          Int
   reviewedOn      DateTime   @default(now()) @map("reviewed_on") @db.Date
@@ -303,7 +388,9 @@ model ContractorReview {
   createdAt       DateTime   @default(now()) @map("created_at") @db.Timestamptz(6)
   updatedAt       DateTime   @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
   contractor      Contractor @relation(fields: [contractorId], references: [id], onDelete: Cascade)
+  workspace       Workspace  @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@index([contractorId, reviewedOn(sort: Desc)], map: "idx_contractor_reviews_contractor_reviewed")
+  @@index([workspaceId, reviewedOn(sort: Desc)], map: "idx_contractor_reviews_workspace")
   @@map("contractor_reviews")
 }

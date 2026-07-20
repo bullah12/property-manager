@@ -4,6 +4,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useMe } from "@/hooks/use-me";
 import { JobsHealthCard } from "./jobs-health";
 import { SettingsForm } from "./settings-form";
+import { WorkspaceControl } from "./workspace-control";
 
 export function SettingsScreen() {
   const { data: me, isLoading, isError, refetch } = useMe();
@@ -28,6 +29,7 @@ export function SettingsScreen() {
   }
   return (
     <div className="space-y-6">
+      <WorkspaceControl />
       <SettingsForm me={me} />
       <JobsHealthCard />
     </div>

@@ -5,7 +5,7 @@ import { apiHandler } from "@/lib/api/handler";
 import { ok, okList, listMeta } from "@/lib/api/respond";
 import { paginationQuery, parseBody, parseQuery } from "@/lib/api/validate";
 import { requireAdmin } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { prisma, requireWorkspaceId } from "@/lib/db";
 import { parseDateOnly } from "@/lib/dates";
 import {
   createTransactionSchema,
@@ -82,6 +82,7 @@ export const POST = apiHandler(async (req) => {
 
   const created = await prisma.transaction.create({
     data: {
+      workspaceId: requireWorkspaceId(),
       ...body,
       occurredOn: parseDateOnly(body.occurredOn),
       rentPeriod: body.rentPeriod ? parseDateOnly(body.rentPeriod) : null,

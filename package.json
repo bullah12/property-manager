@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "next dev",
     "build": "next build",
+    "postinstall": "prisma generate",
     "start": "next start",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit",
@@ -15,7 +16,8 @@
     "db:seed": "tsx db/seed.ts",
     "db:generate": "prisma generate",
     "test:golden": "tsx tests/golden-lease.test.ts",
-    "test:income": "tsx --test tests/income.test.ts"
+    "test:income": "tsx --test tests/income.test.ts",
+    "test:workspace": "tsx --test tests/workspace-isolation.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
