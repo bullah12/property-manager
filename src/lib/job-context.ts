@@ -1,4 +1,4 @@
-import type { Property, Tenancy, Tenant, UserSettings } from "@prisma/client";
+import type { Property, Tenancy, Tenant } from "@prisma/client";
 import type {
   ContractGenerationJobContextDto,
   JobMissingFieldDto,
@@ -6,11 +6,9 @@ import type {
 } from "@/lib/types";
 
 type ContractJobTenancy = Tenancy & { property: Property; tenant: Tenant };
-type ContractJobSettings = Pick<UserSettings, "landlordAddress" | "landlordPhone">;
-
 const ERROR_FIELD_LABELS: Record<string, string> = {
   "landlord.fullName": "Landlord name",
-  "landlord.address": "Landlord correspondence address (Settings)",
+  "landlord.address": "Landlord address for notices (Property)",
   "tenant.fullName": "Tenant name",
   "property.fullAddress": "Property address",
   "tenancy.startDateLong": "Tenancy start date",
@@ -22,6 +20,7 @@ const ERROR_FIELD_LABELS: Record<string, string> = {
 
 const CURRENT_DATA_PATHS = new Set([
   "tenant.fullName",
+  "landlord.fullName",
   "landlord.address",
   "property.fullAddress",
 ]);
@@ -43,7 +42,6 @@ export function buildContractGenerationJobContext(
   tenancyId: string,
   contractKind: "lease" | "renewal",
   tenancy: ContractJobTenancy | undefined,
-  settings: ContractJobSettings | null,
   lastError: string | null
 ): ContractGenerationJobContextDto {
   const missingFields: JobMissingFieldDto[] = [];
@@ -61,12 +59,14 @@ export function buildContractGenerationJobContext(
     if (!tenancy.property.postcode.trim()) {
       addMissingField(missingFields, "property.fullAddress");
     }
+    if (!tenancy.property.landlordName?.trim()) {
+      addMissingField(missingFields, "landlord.fullName");
+    }
+    if (!tenancy.property.landlordAddress?.trim()) {
+      addMissingField(missingFields, "landlord.address");
+    }
   } else {
     addMissingField(missingFields, "tenancy", "Tenancy record");
-  }
-
-  if (!settings?.landlordAddress?.trim()) {
-    addMissingField(missingFields, "landlord.address");
   }
 
   if (lastError) {
@@ -83,7 +83,7 @@ export function buildContractGenerationJobContext(
     ? `/properties/${tenancy.propertyId}?tab=tenancy`
     : null;
   const canEditTenancy = tenancy?.status === "draft";
-  const needsLandlordSettings = missingFields.some((field) =>
+  const needsLandlordDetails = missingFields.some((field) =>
     field.path.startsWith("landlord.")
   );
 
@@ -97,8 +97,8 @@ export function buildContractGenerationJobContext(
     propertyNickname: tenancy?.property.nickname ?? null,
     missingFields,
     linkPath: propertyPath,
-    editPath: needsLandlordSettings
-      ? "/settings"
+    editPath: needsLandlordDetails && tenancy
+      ? `/properties/${tenancy.propertyId}/edit`
       : canEditTenancy
         ? `/tenancies/${tenancyId}/edit`
         : propertyPath,

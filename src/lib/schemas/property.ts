@@ -11,6 +11,10 @@ export const createPropertySchema = z.object({
   propertyType: z.enum(PROPERTY_TYPES),
   bedrooms: z.number().int().min(0).max(100).nullish(),
   purchasePriceCents: z.number().int().min(0).nullish(),
+  landlordName: z.string().trim().min(1).max(300),
+  landlordAddress: z.string().trim().min(1).max(500),
+  landlordPhone: z.string().trim().max(50).nullish(),
+  landlordEmail: z.string().trim().pipe(z.email()).nullish(),
   notes: z.string().max(10_000).nullish(),
 });
 

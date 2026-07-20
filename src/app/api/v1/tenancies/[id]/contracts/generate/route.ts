@@ -46,13 +46,14 @@ const bodySchema = z.object({
 
 /** §5.4 pipeline entry → 202 + job id; 409 if a live contract of that kind exists. */
 export const POST = apiHandler<{ id: string }>(async (req, { params }) => {
-  await requireAdmin();
+  const { user } = await requireAdmin();
   const { id } = parse(paramsSchema, params);
   const body = await parseBody(req, bodySchema);
   const job = await requestContractGeneration({
     tenancyId: id,
     kind: body.kind,
     clauses: body.clauses,
+    requestedByUserId: user.id,
   });
   kickJobRunner();
   return ok({ jobId: job.id, status: "queued" }, 202);

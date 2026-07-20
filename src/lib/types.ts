@@ -44,6 +44,10 @@ export interface PropertyDto {
   propertyType: "house" | "flat" | "hmo" | "commercial";
   bedrooms: number | null;
   purchasePriceCents: number | null;
+  landlordName: string | null;
+  landlordAddress: string | null;
+  landlordPhone: string | null;
+  landlordEmail: string | null;
   currency: string;
   notes: string | null;
   status: "active" | "archived";

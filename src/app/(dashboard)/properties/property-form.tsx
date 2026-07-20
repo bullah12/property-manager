@@ -40,6 +40,10 @@ const formSchema = z.object({
   purchasePrice: z
     .string()
     .regex(/^(\d+(\.\d{1,2})?)?$/, "Amount in pounds, e.g. 250000 or 250000.00"),
+  landlordName: z.string().trim().min(1, "Required").max(300),
+  landlordAddress: z.string().trim().min(1, "Required").max(500),
+  landlordPhone: z.string().trim().max(50),
+  landlordEmail: z.union([z.literal(""), z.string().trim().pipe(z.email("Invalid email"))]),
   notes: z.string().max(10_000),
 });
 
@@ -64,6 +68,10 @@ export function PropertyForm({ property }: { property?: PropertyDto }) {
         property?.purchasePriceCents != null
           ? (property.purchasePriceCents / 100).toFixed(2)
           : "",
+      landlordName: property?.landlordName ?? "",
+      landlordAddress: property?.landlordAddress ?? "",
+      landlordPhone: property?.landlordPhone ?? "",
+      landlordEmail: property?.landlordEmail ?? "",
       notes: property?.notes ?? "",
     },
   });
@@ -82,6 +90,10 @@ export function PropertyForm({ property }: { property?: PropertyDto }) {
           values.purchasePrice === ""
             ? null
             : Math.round(parseFloat(values.purchasePrice) * 100),
+        landlordName: values.landlordName,
+        landlordAddress: values.landlordAddress,
+        landlordPhone: values.landlordPhone || null,
+        landlordEmail: values.landlordEmail || null,
         notes: values.notes || null,
       };
       if (isEdit) {
@@ -105,7 +117,7 @@ export function PropertyForm({ property }: { property?: PropertyDto }) {
   });
 
   return (
-    <Card className="max-w-2xl">
+    <Card className="max-w-3xl">
       <CardHeader>
         <CardTitle>{isEdit ? `Edit ${property.nickname}` : "New property"}</CardTitle>
       </CardHeader>
@@ -231,6 +243,73 @@ export function PropertyForm({ property }: { property?: PropertyDto }) {
                   </FormItem>
                 )}
               />
+            </div>
+            <div className="space-y-4 rounded-lg border p-4">
+              <div>
+                <h3 className="font-medium">Legal landlord</h3>
+                <p className="text-sm text-muted-foreground">
+                  Used on agreements for this property. This can be different from the
+                  person signed in and generating the document.
+                </p>
+              </div>
+              <FormField
+                control={form.control}
+                name="landlordName"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Landlord&apos;s full legal name</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Individual or company legal name" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="landlordAddress"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Address for service of notices</FormLabel>
+                    <FormControl>
+                      <Input {...field} placeholder="Postal address in England or Wales" />
+                    </FormControl>
+                    <FormDescription>
+                      This is printed in the agreement and must be an address where the
+                      landlord can receive legal notices.
+                    </FormDescription>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <div className="grid gap-4 sm:grid-cols-2">
+                <FormField
+                  control={form.control}
+                  name="landlordPhone"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Landlord phone (optional)</FormLabel>
+                      <FormControl>
+                        <Input type="tel" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+                <FormField
+                  control={form.control}
+                  name="landlordEmail"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Landlord email (optional)</FormLabel>
+                      <FormControl>
+                        <Input type="email" {...field} />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+              </div>
             </div>
             <FormField
               control={form.control}

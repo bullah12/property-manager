@@ -97,6 +97,11 @@ export function PropertyDetail({ id }: { id: string }) {
             <span className="capitalize">{property.propertyType}</span>
             {property.bedrooms != null ? ` · ${property.bedrooms} bed` : ""}
           </p>
+          <p className="mt-1 text-sm text-muted-foreground">
+            Landlord: {property.landlordName ?? "Not set"}
+            {property.landlordEmail ? ` · ${property.landlordEmail}` : ""}
+            {property.landlordPhone ? ` · ${property.landlordPhone}` : ""}
+          </p>
         </div>
         <div className="flex items-center gap-2">
           <Button variant="outline" asChild>

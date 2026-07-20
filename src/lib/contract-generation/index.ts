@@ -19,6 +19,7 @@ export interface GeneratePayload {
   tenancyId: string;
   kind: "lease";
   clauses: ClauseInput;
+  requestedByUserId?: string;
 }
 
 /** Route-side validation + enqueue → 202 (PLAN.md §6). */
@@ -45,9 +46,10 @@ async function handleContractGenerate(job: Job) {
   const payload = job.payload as unknown as GeneratePayload;
 
   // 1. LOAD
-  const owner = await getOwner();
-  const settings = await prisma.userSettings.findUnique({ where: { userId: owner.id } });
-  if (!settings) throw new Error("contract.generate: owner settings not found");
+  const requestedBy = payload.requestedByUserId
+    ? await prisma.user.findUnique({ where: { id: payload.requestedByUserId } })
+    : null;
+  const actor = requestedBy ?? (await getOwner());
   const tenancy = await prisma.tenancy.findUnique({
     where: { id: payload.tenancyId },
     include: { property: true, tenant: true },
@@ -56,8 +58,12 @@ async function handleContractGenerate(job: Job) {
 
   // 2–3. BUILD + VALIDATE (fails loudly on any missing field)
   const viewModel = buildLeaseViewModel({
-    owner,
-    settings,
+    landlord: {
+      fullName: tenancy.property.landlordName ?? "",
+      address: tenancy.property.landlordAddress ?? "",
+      phone: tenancy.property.landlordPhone,
+      email: tenancy.property.landlordEmail,
+    },
     property: tenancy.property,
     tenancy,
     tenant: tenancy.tenant,
@@ -73,7 +79,7 @@ async function handleContractGenerate(job: Job) {
   await uploadToStorage(storageKey, pdf, "application/pdf");
   const file = await prisma.file.create({
     data: {
-      ownerId: owner.id,
+      ownerId: actor.id,
       purpose: "generated-lease",
       storageKey,
       contentType: "application/pdf",
@@ -109,7 +115,7 @@ async function handleContractGenerate(job: Job) {
   });
 
   // 9. notify (in-app only per the §5.3 catalog)
-  await notify(owner.id, "contract.generated", {
+  await notify(actor.id, "contract.generated", {
     title: `Lease generated for ${tenancy.tenant.fullName} at ${tenancy.property.nickname}`,
     body: `A draft ${payload.kind} contract is ready on the Contracts tab.`,
     linkPath: `/properties/${tenancy.propertyId}?tab=contracts`,
@@ -119,8 +125,11 @@ async function handleContractGenerate(job: Job) {
 async function onContractGenerateDead(job: Job) {
   const payload = job.payload as unknown as GeneratePayload;
   try {
-    const owner = await getOwner();
-    await notify(owner.id, "contract.generation_failed", {
+    const requestedBy = payload.requestedByUserId
+      ? await prisma.user.findUnique({ where: { id: payload.requestedByUserId } })
+      : null;
+    const actor = requestedBy ?? (await getOwner());
+    await notify(actor.id, "contract.generation_failed", {
       title: "Contract generation failed",
       body: `Generating the ${payload.kind ?? "lease"} contract failed after ${job.attempts} attempts: ${job.lastError ?? "unknown error"}`,
       linkPath: `/settings`,

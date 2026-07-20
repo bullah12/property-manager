@@ -131,7 +131,7 @@ function JobRow({
           {context?.editPath ? (
             <Button variant="outline" size="sm" asChild>
               <Link href={context.editPath}>
-                {context.canEditTenancy && needsInput ? "Complete details" : "View tenancy"}
+                {needsInput ? "Complete details" : "View tenancy"}
                 <ExternalLink className="size-4" />
               </Link>
             </Button>

@@ -50,7 +50,7 @@ export async function notify(
   return id;
 }
 
-/** The single owner-admin (v1: one account, PLAN.md §1). */
+/** Legacy-job fallback: use the earliest active admin when no requester was recorded. */
 export async function getOwner() {
   const owner = await prisma.user.findFirst({
     where: { role: "admin", status: "active" },

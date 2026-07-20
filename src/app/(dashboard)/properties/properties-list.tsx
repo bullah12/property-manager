@@ -37,6 +37,10 @@ const columns: ColumnDef<PropertyDto, unknown>[] = [
     ),
   },
   {
+    header: "Landlord",
+    cell: ({ row }) => row.original.landlordName ?? "—",
+  },
+  {
     header: "Type",
     meta: { sortField: "property_type" },
     cell: ({ row }) => <span className="capitalize">{row.original.propertyType}</span>,

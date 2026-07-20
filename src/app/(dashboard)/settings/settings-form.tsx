@@ -127,7 +127,8 @@ export function SettingsForm({ me }: { me: MeDto }) {
                     <Input {...field} />
                   </FormControl>
                   <FormDescription>
-                    Used as the landlord name on generated documents.
+                    Identifies you in the app. Generated agreements use the legal
+                    landlord recorded against each property.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -154,12 +155,13 @@ export function SettingsForm({ me }: { me: MeDto }) {
               name="landlordAddress"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Landlord correspondence address</FormLabel>
+                  <FormLabel>Legacy landlord correspondence address</FormLabel>
                   <FormControl>
                     <Input {...field} placeholder="25 Aiskew Grove, Stockton-on-Tees TS19 7QS, UK" />
                   </FormControl>
                   <FormDescription>
-                    Printed in rent-payment and notices sections of generated agreements.
+                    Retained for older records. New agreements use the address saved on
+                    the property.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>
@@ -170,12 +172,12 @@ export function SettingsForm({ me }: { me: MeDto }) {
               name="landlordPhone"
               render={({ field }) => (
                 <FormItem>
-                  <FormLabel>Landlord phone</FormLabel>
+                  <FormLabel>Legacy landlord phone</FormLabel>
                   <FormControl>
                     <Input {...field} placeholder="07847 617821" />
                   </FormControl>
                   <FormDescription>
-                    Printed in the addresses-for-notice section.
+                    Retained for older records. New agreements use the property landlord.
                   </FormDescription>
                   <FormMessage />
                 </FormItem>

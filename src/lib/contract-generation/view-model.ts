@@ -1,4 +1,4 @@
-import type { Property, Tenancy, Tenant, User, UserSettings } from "@prisma/client";
+import type { Property, Tenancy, Tenant } from "@prisma/client";
 import { z } from "zod";
 import { toDateOnly } from "@/lib/dates";
 
@@ -65,6 +65,13 @@ export interface ClauseInput {
   billsDescription?: string;
 }
 
+export interface LandlordInput {
+  fullName: string;
+  address: string;
+  phone: string | null;
+  email: string | null;
+}
+
 const MONTHS = [
   "January", "February", "March", "April", "May", "June",
   "July", "August", "September", "October", "November", "December",
@@ -91,14 +98,13 @@ export function ordinal(value: number): string {
 }
 
 export function buildLeaseViewModel(opts: {
-  owner: User;
-  settings: UserSettings;
+  landlord: LandlordInput;
   property: Property;
   tenancy: Tenancy;
   tenant: Tenant;
   clauses: ClauseInput;
 }): LeaseV2ViewModel {
-  const { owner, settings, property, tenancy, tenant, clauses } = opts;
+  const { landlord, property, tenancy, tenant, clauses } = opts;
   const propertyAddress = [
     property.addressLine1,
     property.addressLine2,
@@ -112,10 +118,10 @@ export function buildLeaseViewModel(opts: {
 
   const candidate = {
     landlord: {
-      fullName: owner.displayName,
-      address: settings.landlordAddress ?? "",
-      phone: settings.landlordPhone,
-      email: owner.email,
+      fullName: landlord.fullName,
+      address: landlord.address,
+      phone: landlord.phone,
+      email: landlord.email,
     },
     tenant: {
       fullName: tenant.fullName,
