@@ -1,7 +1,7 @@
 "use client";
 
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Loader2, Sparkles, Upload } from "lucide-react";
+import { Download, ExternalLink, Loader2, Sparkles, Upload } from "lucide-react";
 import { useState } from "react";
 import { toast } from "sonner";
 import { DateDisplay } from "@/components/date-display";
@@ -128,6 +128,7 @@ export function ContractsTab({ property }: { property: PropertyDetailDto }) {
 
   return (
     <div className="space-y-4">
+      <PreTenancyDocumentsCard />
       <Card>
         <CardHeader>
           <div className="flex items-start justify-between gap-2">
@@ -269,6 +270,103 @@ export function ContractsTab({ property }: { property: PropertyDetailDto }) {
   );
 }
 
+const PRE_TENANCY_LINKS = [
+  {
+    title: "Written tenancy terms",
+    timing: "Before the tenancy is agreed or signed",
+    detail: "The generated agreement is intended to contain the prescribed written information for a standard assured periodic tenancy.",
+    href: "https://www.gov.uk/assured-tenancy-agreements-a-guide-for-landlords/written-information-you-need-to-give-to-your-tenant",
+  },
+  {
+    title: "Energy Performance Certificate (EPC)",
+    timing: "At marketing and free of charge to the eventual tenant",
+    detail: "Find and download the property-specific certificate from the official register.",
+    href: "https://www.gov.uk/find-energy-certificate",
+  },
+  {
+    title: "Gas safety record",
+    timing: "Before the tenant moves in, where gas safety rules apply",
+    detail: "Upload the property-specific record in Compliance; GOV.UK explains the landlord duties.",
+    href: "https://www.gov.uk/private-renting/your-landlords-safety-responsibilities",
+  },
+  {
+    title: "Electrical inspection report (EICR/EIC)",
+    timing: "Before the new tenant occupies the property",
+    detail: "Upload the latest satisfactory property-specific report in Compliance.",
+    href: "https://www.gov.uk/government/publications/electrical-safety-standards-in-the-private-and-social-rented-sectors-guidance/electrical-safety-standards-in-the-private-and-social-rented-sectors-guidance",
+  },
+  {
+    title: "Tenancy deposit prescribed information",
+    timing: "Within 30 days of receiving a tenancy deposit",
+    detail: "This is issued by or with the selected deposit scheme; it need not exist before the agreement is signed.",
+    href: "https://www.gov.uk/deposit-protection-schemes-and-landlords",
+  },
+  {
+    title: "Right to rent check",
+    timing: "Before allowing an adult to occupy",
+    detail: "This is a landlord check rather than a document to give the tenant.",
+    href: "https://www.gov.uk/check-tenant-right-to-rent-documents",
+  },
+  {
+    title: "Smoke and carbon monoxide alarms",
+    timing: "Install as required and test on the first day",
+    detail: "Record the check in Compliance; this is a safety action rather than a certificate to download.",
+    href: "https://www.gov.uk/renting-out-a-property/landlord-responsibilities",
+  },
+  {
+    title: "Local property licensing check",
+    timing: "Before letting where a council scheme applies",
+    detail: "Use the property postcode to check selective, additional or HMO licensing with the local council.",
+    href: "https://www.gov.uk/find-local-council",
+  },
+] as const;
+
+function PreTenancyDocumentsCard() {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Before the tenancy starts</CardTitle>
+        <CardDescription>
+          England checklist with authoritative government links. Property-specific
+          certificates must be obtained from the relevant assessor or scheme.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="grid gap-3 lg:grid-cols-2">
+          {PRE_TENANCY_LINKS.map((item) => (
+            <div key={item.title} className="rounded-md border p-3">
+              <a
+                href={item.href}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex items-center gap-1 font-medium hover:underline"
+              >
+                {item.title} <ExternalLink className="size-3.5" />
+              </a>
+              <p className="mt-1 text-xs font-medium text-amber-700">{item.timing}</p>
+              <p className="mt-1 text-xs text-muted-foreground">{item.detail}</p>
+            </div>
+          ))}
+        </div>
+        <p className="mt-3 text-xs text-muted-foreground">
+          The Renters&apos; Rights Act Information Sheet 2026 was primarily required for
+          existing written tenancies created before 1 May 2026; it is not a substitute for
+          the prescribed written terms for a new tenancy. {" "}
+          <a
+            href="https://www.gov.uk/government/publications/the-renters-rights-act-information-sheet-2026"
+            target="_blank"
+            rel="noreferrer"
+            className="underline"
+          >
+            Open the official Information Sheet page
+          </a>
+          .
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 function UploadContractDialog({
   open,
   onOpenChange,
@@ -323,7 +421,7 @@ function UploadContractDialog({
               <SelectContent>
                 {tenancies.map((t) => (
                   <SelectItem key={t.id} value={t.id}>
-                    {t.tenant?.fullName ?? "Tenant"} · {t.startDate} → {t.endDate} ({t.status})
+                    {t.tenant?.fullName ?? "Tenant"} · from {t.startDate} · rolling ({t.status})
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -453,11 +551,12 @@ function GenerateContractDialog({
 }) {
   const { data: me } = useMe();
   const [tenancyId, setTenancyId] = useState("");
-  const [kind, setKind] = useState<"lease" | "renewal">("lease");
   const [pets, setPets] = useState(false);
   const [petsDescription, setPetsDescription] = useState("");
   const [garden, setGarden] = useState(false);
-  const [reletLevy, setReletLevy] = useState("");
+  const [gasSafetyApplies, setGasSafetyApplies] = useState(true);
+  const [billsIncluded, setBillsIncluded] = useState(false);
+  const [billsDescription, setBillsDescription] = useState("");
   const [busy, setBusy] = useState(false);
   const [defaultsApplied, setDefaultsApplied] = useState(false);
 
@@ -475,21 +574,21 @@ function GenerateContractDialog({
       toast.error("Describe the pet(s) for the pets clause");
       return;
     }
-    if (reletLevy && !/^\d+(\.\d{1,2})?$/.test(reletLevy)) {
-      toast.error("Enter the re-letting charge in pounds, e.g. 1700.00");
+    if (billsIncluded && !billsDescription.trim()) {
+      toast.error("List the bills included in the rent");
       return;
     }
     setBusy(true);
     try {
       await api.post(`/api/v1/tenancies/${target}/contracts/generate`, {
-        kind,
-        ...(reletLevy
-          ? { reletLevyCents: Math.round(parseFloat(reletLevy) * 100) }
-          : {}),
+        kind: "lease",
         clauses: {
           pets,
           ...(pets ? { petsDescription: petsDescription.trim() } : {}),
           garden,
+          gasSafetyApplies,
+          billsIncluded,
+          ...(billsIncluded ? { billsDescription: billsDescription.trim() } : {}),
         },
       });
       toast.success("Generation queued");
@@ -508,8 +607,8 @@ function GenerateContractDialog({
         <DialogHeader>
           <DialogTitle>Generate contract</DialogTitle>
           <DialogDescription>
-            Renders the lease/v1 template with this tenancy&apos;s details into a
-            draft PDF contract (runs in the background).
+            Creates the England assured-periodic lease/v2 written statement as
+            a draft PDF. Confirm the tenancy classification and property details first.
           </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
@@ -522,23 +621,19 @@ function GenerateContractDialog({
               <SelectContent>
                 {tenancies.map((t) => (
                   <SelectItem key={t.id} value={t.id}>
-                    {t.tenant?.fullName ?? "Tenant"} · {t.startDate} → {t.endDate} ({t.status})
+                    {t.tenant?.fullName ?? "Tenant"} · from {t.startDate} · rolling ({t.status})
                   </SelectItem>
                 ))}
               </SelectContent>
             </Select>
           </div>
-          <div className="space-y-2">
-            <Label>Kind</Label>
-            <Select value={kind} onValueChange={(v) => setKind(v as typeof kind)}>
-              <SelectTrigger className="w-full">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="lease">Lease</SelectItem>
-                <SelectItem value="renewal">Renewal</SelectItem>
-              </SelectContent>
-            </Select>
+          <div className="rounded-md border border-amber-300 bg-amber-50 p-3 text-xs text-amber-900">
+            Use this generator only where the landlord does not live at the property,
+            the property is the tenant&apos;s main home and no assured-tenancy exclusion
+            applies. It is not suitable for lodgers, company or holiday lets, supported
+            accommodation, purpose-built student accommodation, or tenancies linked to
+            employment, agriculture, homelessness duties or a superior lease. Those cases
+            can require different terms or prior possession-ground notices.
           </div>
           <div className="space-y-3 rounded-md border p-3">
             <div className="flex items-center gap-2">
@@ -560,19 +655,33 @@ function GenerateContractDialog({
                 Garden maintenance clause
               </Label>
             </div>
-          </div>
-          <div className="space-y-2">
-            <Label htmlFor="gen-relet-levy">Early-vacation re-letting charge (optional)</Label>
-            <Input
-              id="gen-relet-levy"
-              inputMode="decimal"
-              placeholder="e.g. 1700.00"
-              value={reletLevy}
-              onChange={(event) => setReletLevy(event.target.value)}
-            />
-            <p className="text-xs text-muted-foreground">
-              Leave blank to state that only lawful, reasonable re-letting costs may be recovered.
-            </p>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={gasSafetyApplies}
+                onCheckedChange={(value) => setGasSafetyApplies(Boolean(value))}
+                id="gen-gas"
+              />
+              <Label htmlFor="gen-gas" className="font-normal">
+                Gas fittings or flues serve the property
+              </Label>
+            </div>
+            <div className="flex items-center gap-2">
+              <Checkbox
+                checked={billsIncluded}
+                onCheckedChange={(value) => setBillsIncluded(Boolean(value))}
+                id="gen-bills"
+              />
+              <Label htmlFor="gen-bills" className="font-normal">
+                Rent includes bills
+              </Label>
+            </div>
+            {billsIncluded ? (
+              <Input
+                placeholder="e.g. water and council tax"
+                value={billsDescription}
+                onChange={(event) => setBillsDescription(event.target.value)}
+              />
+            ) : null}
           </div>
         </div>
         <DialogFooter>

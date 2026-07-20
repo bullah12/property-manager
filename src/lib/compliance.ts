@@ -8,6 +8,7 @@ export const COMPLIANCE_KINDS = [
   "electrical_eicr",
   "epc",
   "smoke_co_check",
+  "selective_licence",
   "inspection",
   "insurance",
   "custom",

@@ -52,7 +52,7 @@ export const GET = apiHandler(async () => {
     },
   });
 
-  // Deadlines due ≤30 days: reminder rows (compliance + lease expiry) —
+  // Deadlines due ≤30 days: reminder rows (currently compliance items) —
   // overdue ones count too, they are still open deadlines.
   const soonCutoff = parseDateOnly(today);
   soonCutoff.setUTCDate(soonCutoff.getUTCDate() + 30);

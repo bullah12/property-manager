@@ -59,7 +59,7 @@ interface IncomeRowDto {
     id: string;
     status: string;
     startDate: string;
-    endDate: string;
+    endDate: string | null;
     rentAmountCents: number;
     rentDueDay: number;
     tenant: { id: string; fullName: string } | null;

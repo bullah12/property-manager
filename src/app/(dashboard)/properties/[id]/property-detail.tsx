@@ -188,12 +188,15 @@ export function PropertyDetail({ id }: { id: string }) {
         onValueChange={(v) => router.replace(`${pathname}?tab=${v}`)}
       >
         <TabsList className="flex-wrap">
+          <TabsTrigger value="tenancy">Tenancy</TabsTrigger>
           <TabsTrigger value="contracts">Contracts</TabsTrigger>
           <TabsTrigger value="income">Monthly Income</TabsTrigger>
           <TabsTrigger value="expenses">Expenses</TabsTrigger>
-          <TabsTrigger value="notifications">Notifications</TabsTrigger>
-          <TabsTrigger value="tenancy">Tenancy</TabsTrigger>
+          <TabsTrigger value="notifications">Compliance</TabsTrigger>
         </TabsList>
+        <TabsContent value="tenancy">
+          <TenancyTab property={property} />
+        </TabsContent>
         <TabsContent value="contracts">
           <ContractsTab property={property} />
         </TabsContent>
@@ -205,9 +208,6 @@ export function PropertyDetail({ id }: { id: string }) {
         </TabsContent>
         <TabsContent value="notifications">
           <NotificationsTab property={property} />
-        </TabsContent>
-        <TabsContent value="tenancy">
-          <TenancyTab property={property} />
         </TabsContent>
       </Tabs>
     </div>

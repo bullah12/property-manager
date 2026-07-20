@@ -3,7 +3,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { toast } from "sonner";
 import { DateDisplay } from "@/components/date-display";
@@ -41,7 +40,6 @@ import { api, ApiClientError } from "@/lib/api-client";
 import type { PropertyDetailDto, TenancyDto } from "@/lib/types";
 
 export function TenancyTab({ property }: { property: PropertyDetailDto }) {
-  const router = useRouter();
   const queryClient = useQueryClient();
 
   const query = useQuery({
@@ -60,7 +58,7 @@ export function TenancyTab({ property }: { property: PropertyDetailDto }) {
       override,
     }: {
       id: string;
-      action: "activate" | "end" | "renew";
+      action: "activate" | "end";
       override?: boolean;
     }) =>
       (
@@ -72,12 +70,7 @@ export function TenancyTab({ property }: { property: PropertyDetailDto }) {
     onSuccess: (data, { action }) => {
       queryClient.invalidateQueries({ queryKey: ["tenancies"] });
       queryClient.invalidateQueries({ queryKey: ["property", property.id] });
-      if (action === "renew") {
-        toast.success("Successor draft created — review and activate it when signed");
-        router.push(`/tenancies/${data.id}/edit`);
-      } else {
-        toast.success(action === "activate" ? "Tenancy activated" : "Tenancy ended");
-      }
+      toast.success(action === "activate" ? "Tenancy activated" : "Tenancy ended");
     },
     onError: (err, { id, action }) => {
       if (
@@ -144,16 +137,7 @@ export function TenancyTab({ property }: { property: PropertyDetailDto }) {
                   </>
                 ) : null}
                 {current.status === "active" ? (
-                  <>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      disabled={transition.isPending}
-                      onClick={() => transition.mutate({ id: current.id, action: "renew" })}
-                    >
-                      Renew
-                    </Button>
-                    <AlertDialog>
+                  <AlertDialog>
                       <AlertDialogTrigger asChild>
                         <Button variant="destructive" size="sm" disabled={transition.isPending}>
                           End tenancy
@@ -176,8 +160,7 @@ export function TenancyTab({ property }: { property: PropertyDetailDto }) {
                           </AlertDialogAction>
                         </AlertDialogFooter>
                       </AlertDialogContent>
-                    </AlertDialog>
-                  </>
+                  </AlertDialog>
                 ) : null}
               </div>
             </div>
@@ -185,9 +168,10 @@ export function TenancyTab({ property }: { property: PropertyDetailDto }) {
           <CardContent>
             <dl className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm sm:grid-cols-3">
               <div>
-                <dt className="text-muted-foreground">Term</dt>
+                <dt className="text-muted-foreground">Tenancy</dt>
                 <dd>
-                  <DateDisplay iso={current.startDate} /> — <DateDisplay iso={current.endDate} />
+                  Assured periodic · monthly<br />
+                  <span className="text-muted-foreground">Started <DateDisplay iso={current.startDate} /></span>
                 </dd>
               </div>
               <div>

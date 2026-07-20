@@ -120,7 +120,7 @@ model Tenancy {
   propertyId         String        @map("property_id") @db.Uuid
   tenantId           String        @map("tenant_id") @db.Uuid
   startDate          DateTime      @map("start_date") @db.Date
-  endDate            DateTime      @map("end_date") @db.Date
+  endDate            DateTime?     @map("end_date") @db.Date
   endedOn            DateTime?     @map("ended_on") @db.Date
   rentAmountCents    Int           @map("rent_amount_cents")
   rentDueDay         Int           @map("rent_due_day")

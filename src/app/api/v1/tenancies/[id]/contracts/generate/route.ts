@@ -8,16 +8,40 @@ import { kickJobRunner } from "@/lib/jobs";
 
 const paramsSchema = z.object({ id: z.uuid() });
 
+const clausesSchema = z
+  .object({
+    pets: z.boolean().default(false),
+    petsDescription: z.string().trim().max(500).optional(),
+    garden: z.boolean().default(false),
+    gasSafetyApplies: z.boolean().default(true),
+    billsIncluded: z.boolean().default(false),
+    billsDescription: z.string().trim().max(500).optional(),
+  })
+  .superRefine((clauses, ctx) => {
+    if (clauses.pets && !clauses.petsDescription) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["petsDescription"],
+        message: "Describe the pet when recording consent",
+      });
+    }
+    if (clauses.billsIncluded && !clauses.billsDescription) {
+      ctx.addIssue({
+        code: "custom",
+        path: ["billsDescription"],
+        message: "List the bills included in the rent",
+      });
+    }
+  });
+
 const bodySchema = z.object({
-  kind: z.enum(["lease", "renewal"]).default("lease"),
-  reletLevyCents: z.number().int().min(0).max(10_000_000).optional(),
-  clauses: z
-    .object({
-      pets: z.boolean().default(false),
-      petsDescription: z.string().trim().max(500).optional(),
-      garden: z.boolean().default(false),
-    })
-    .default({ pets: false, garden: false }),
+  kind: z.literal("lease").default("lease"),
+  clauses: clausesSchema.default({
+    pets: false,
+    garden: false,
+    gasSafetyApplies: true,
+    billsIncluded: false,
+  }),
 });
 
 /** §5.4 pipeline entry → 202 + job id; 409 if a live contract of that kind exists. */
@@ -29,7 +53,6 @@ export const POST = apiHandler<{ id: string }>(async (req, { params }) => {
     tenancyId: id,
     kind: body.kind,
     clauses: body.clauses,
-    reletLevyCents: body.reletLevyCents,
   });
   kickJobRunner();
   return ok({ jobId: job.id, status: "queued" }, 202);

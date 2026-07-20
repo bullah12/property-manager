@@ -1,5 +1,5 @@
 /**
- * Golden-file test (pdf-document-generation skill): render lease/v1 with
+ * Golden-file test: render lease/v2 with
  * fixture data, write a PDF, extract the text layer and diff it against
  * tests/golden/lease-v1.txt — catches template/layout regressions.
  *
@@ -7,18 +7,18 @@
  *      npm run test:golden -- --update   (rewrites the golden file)
  */
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { buildGeneratedLeaseFilename } from "../src/lib/contract-generation/filename";
 import { renderLeasePdf } from "../src/lib/contract-generation/render";
-import { leaseV1Schema } from "../src/lib/contract-generation/view-model";
+import { leaseV2Schema } from "../src/lib/contract-generation/view-model";
 import "dotenv/config";
 
-const GOLDEN_PATH = path.join(process.cwd(), "tests", "golden", "lease-v1.txt");
+const GOLDEN_PATH = path.join(process.cwd(), "tests", "golden", "lease-v2.txt");
 
 /** Fixture view model — every merge field exercised, both clauses on. */
-const fixture = leaseV1Schema.parse({
+const fixture = leaseV2Schema.parse({
   landlord: {
     fullName: "Zulfiqar Ali Taj",
     address: "25 Aiskew Grove, Stockton-on-Tees TS19 7QS, UK",
@@ -32,15 +32,18 @@ const fixture = leaseV1Schema.parse({
     startDateIso: "2026-07-01",
     rentAmountDisplay: "£1,050.00",
     rentDueDayOrdinal: "1st",
+    depositTaken: true,
     depositAmountDisplay: "£1,050.00",
     depositSchemeName: "mydeposits",
     depositReference: "MYD-88104",
-    reletLevyDisplay: "£1,700.00",
   },
   clauses: {
     pets: true,
     petsDescription: "one small dog",
     garden: true,
+    gasSafetyApplies: true,
+    billsIncluded: true,
+    billsDescription: "water and council tax",
   },
 });
 
@@ -67,6 +70,13 @@ async function extractText(pdf: Buffer): Promise<string> {
 async function main() {
   const update = process.argv.includes("--update");
   const pdf = renderLeasePdf(fixture);
+  if (process.argv.includes("--render")) {
+    const renderDir = path.join(process.cwd(), "tmp", "pdfs");
+    mkdirSync(renderDir, { recursive: true });
+    const renderPath = path.join(renderDir, "lease-v2-sample.pdf");
+    writeFileSync(renderPath, pdf);
+    console.log(`Rendered PDF fixture: ${renderPath}`);
+  }
   const text = await extractText(pdf);
   const filename = buildGeneratedLeaseFilename(fixture);
   if (
@@ -84,7 +94,7 @@ async function main() {
 
   const golden = readFileSync(GOLDEN_PATH, "utf8").trimEnd();
   if (text.trimEnd() === golden) {
-    console.log("PASS golden-lease: PDF text layer matches tests/golden/lease-v1.txt");
+    console.log("PASS golden-lease: PDF text layer matches tests/golden/lease-v2.txt");
     return;
   }
 
@@ -99,7 +109,7 @@ async function main() {
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
-  console.error("FAIL golden-lease: PDF text layer diverged from the golden file");
+  console.error("FAIL golden-lease: PDF text layer diverged from the lease/v2 golden file");
   process.exit(1);
 }
 

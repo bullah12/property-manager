@@ -107,6 +107,7 @@ async function loadSubject(
     include: { property: true, tenant: true },
   });
   if (!tenancy) return null;
+  if (!tenancy.endDate) return null;
   const end = toDateOnly(tenancy.endDate);
   return {
     title: (d) =>

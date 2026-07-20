@@ -38,7 +38,7 @@ export const GET = apiHandler(async (req) => {
   return okList(rows.map(serializeTenancy), listMeta(q.page, q.perPage, total));
 });
 
-/** Create as 'draft' (PLAN.md §6); arms the lease-expiry reminder (§5.2). */
+/** Create a rolling assured-periodic tenancy as a draft (PLAN.md §6). */
 export const POST = apiHandler(async (req) => {
   await requireAdmin();
   const body = await parseBody(req, createTenancySchema);
@@ -55,12 +55,12 @@ export const POST = apiHandler(async (req) => {
       data: {
         ...body,
         startDate: parseDateOnly(body.startDate),
-        endDate: parseDateOnly(body.endDate),
+        endDate: body.endDate ? parseDateOnly(body.endDate) : null,
         status: "draft",
       },
       include: { tenant: true, property: true },
     });
-    // §5.2: draft/active tenancies carry a lease-expiry reminder.
+    // The reminder hook removes any legacy lease-expiry reminder because APTs roll.
     await syncTenancyReminder(tx, created);
     return created;
   });

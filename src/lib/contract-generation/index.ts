@@ -17,9 +17,8 @@ import { buildLeaseViewModel, TEMPLATE_VERSION, type ClauseInput } from "./view-
 
 export interface GeneratePayload {
   tenancyId: string;
-  kind: "lease" | "renewal";
+  kind: "lease";
   clauses: ClauseInput;
-  reletLevyCents?: number;
 }
 
 /** Route-side validation + enqueue → 202 (PLAN.md §6). */
@@ -63,7 +62,6 @@ async function handleContractGenerate(job: Job) {
     tenancy,
     tenant: tenancy.tenant,
     clauses: payload.clauses,
-    reletLevyCents: payload.reletLevyCents,
   });
 
   // 4–5. LAYOUT + WRITE PDF (directly; no browser runtime)

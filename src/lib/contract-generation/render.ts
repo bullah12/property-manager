@@ -1,7 +1,7 @@
 import { buildLeaseSections } from "./template";
-import type { LeaseV1ViewModel } from "./view-model";
+import type { LeaseV2ViewModel } from "./view-model";
 
-/** Browser-free, A4 lease/v1 renderer distilled from the supplied DOCX. */
+/** Browser-free, A4 lease/v2 renderer distilled from the supplied DOCX. */
 
 const PAGE_WIDTH = 595.28;
 const PAGE_HEIGHT = 841.89;
@@ -91,7 +91,7 @@ function pdfLiteral(value: string): string {
     const code = character.codePointAt(0) ?? 63;
     if (code > 255) {
       throw new Error(
-        `lease/v1 PDF cannot encode character ${character} (U+${code.toString(16).toUpperCase()})`
+        `lease/v2 PDF cannot encode character ${character} (U+${code.toString(16).toUpperCase()})`
       );
     }
     if (character === "\\" || character === "(" || character === ")") {
@@ -209,11 +209,11 @@ class LeaseLayout {
     this.y -= after;
   }
 
-  opening(viewModel: LeaseV1ViewModel) {
+  opening(viewModel: LeaseV2ViewModel) {
     this.centred("ASSURED PERIODIC TENANCY AGREEMENT", 16, "bold", 23);
     this.centred("(Under the Renters' Rights Act 2025)", 12, "bold", 38);
     this.centred(
-      `THIS AGREEMENT is made on ${viewModel.tenancy.startDateLong}`,
+      `THIS AGREEMENT records a tenancy starting on ${viewModel.tenancy.startDateLong}`,
       11,
       "regular",
       30
@@ -236,7 +236,7 @@ class LeaseLayout {
     );
     this.notice(
       "IMPORTANT NOTICE TO BOTH PARTIES",
-      "This Agreement creates an Assured Periodic Tenancy (APT) under the Renters' Rights Act 2025 and the Housing Act 1988 (as amended). From 1 May 2026, Assured Shorthold Tenancies (ASTs) no longer exist in England. All residential tenancies in the private rented sector are now Assured Periodic Tenancies with no fixed end date. Section 21 'no-fault' eviction notices can no longer be served. The Landlord may only seek possession using grounds under Section 8 of the Housing Act 1988 (as amended by the Renters' Rights Act 2025)."
+      "This form is for a standard assured periodic tenancy in England created on or after 1 May 2026. It has no fixed end date. It is not suitable for a lodger, holiday or company let, business tenancy, qualifying purpose-built student accommodation, supported accommodation, or another excluded or specialist arrangement requiring prior possession-ground notice."
     );
   }
 
@@ -290,7 +290,7 @@ class LeaseLayout {
     this.y -= after;
   }
 
-  property(viewModel: LeaseV1ViewModel) {
+  property(viewModel: LeaseV2ViewModel) {
     const address = viewModel.property.fullAddress;
     const lines = wrapText(address, 11, CONTENT_WIDTH - 24);
     this.ensureSpace(lines.length * 14 + 28);
@@ -321,43 +321,34 @@ class LeaseLayout {
     this.y -= 2;
   }
 
-  execution(viewModel: LeaseV1ViewModel) {
+  execution(viewModel: LeaseV2ViewModel) {
+    // Keep the agreement's execution block intact on its own signature page.
+    this.newPage();
     this.heading("Execution");
     this.paragraph(
-      "IN WITNESS WHEREOF the Parties have duly executed this Agreement on the date first written above.",
+      "The Parties sign below to confirm their agreement to these terms. Each Party should enter the date on which they sign.",
       { before: 0, after: 14 }
     );
     this.signatureBlock("LANDLORD", viewModel.landlord.fullName);
     this.signatureBlock("TENANT", viewModel.tenant.fullName);
 
-    this.ensureSpace(106);
+    this.ensureSpace(70);
     this.page.commands.push(
       `0.7 G 0.5 w ${MARGIN_X.toFixed(2)} ${this.y.toFixed(2)} m ${(PAGE_WIDTH - MARGIN_X).toFixed(2)} ${this.y.toFixed(2)} l S 0 G`
     );
     this.y -= 17;
     this.paragraph(
-      "The Tenant acknowledges receiving a copy of this Agreement and the Government's Renters' Rights Act Information Sheet.",
-      { before: 0, after: 15, size: 10, font: "italic" }
+      "Signing this Agreement does not replace the Landlord's separate duty to provide the EPC, applicable safety records, deposit prescribed information and any other required documents at the times required by law.",
+      { before: 0, after: 0, size: 10, font: "italic" }
     );
-    this.paragraph("Tenant Signature: ______________________________", {
-      before: 0,
-      after: 6,
-    });
-    this.paragraph("Date: ______________________________", { before: 0, after: 0 });
   }
 
   private signatureBlock(label: string, name: string) {
-    this.ensureSpace(174);
+    this.ensureSpace(96);
     this.paragraph(`SIGNED by the ${label}:`, { before: 0, after: 18, font: "bold" });
     this.paragraph("Signature: ______________________________", { before: 0, after: 2 });
     this.paragraph(`Name: ${name}`, { before: 0, after: 2 });
-    this.paragraph("Date: ______________________________", { before: 0, after: 15 });
-    this.paragraph("Witness Signature: ______________________________", {
-      before: 0,
-      after: 2,
-    });
-    this.paragraph("Witness Name: ______________________________", { before: 0, after: 2 });
-    this.paragraph("Witness Address: ______________________________", { before: 0, after: 15 });
+    this.paragraph("Date: ______________________________", { before: 0, after: 18 });
   }
 
   addFooters() {
@@ -411,7 +402,7 @@ function buildPdf(pages: PdfPage[]): Buffer {
   return Buffer.from(pdf, "ascii");
 }
 
-export function renderLeasePdf(viewModel: LeaseV1ViewModel): Buffer {
+export function renderLeasePdf(viewModel: LeaseV2ViewModel): Buffer {
   const layout = new LeaseLayout();
   layout.opening(viewModel);
   for (const section of buildLeaseSections(viewModel)) {

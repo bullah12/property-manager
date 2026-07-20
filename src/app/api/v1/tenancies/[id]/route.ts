@@ -31,8 +31,13 @@ export const PATCH = apiHandler<{ id: string }>(async (req, { params }) => {
   }
 
   const startDate = body.startDate ? parseDateOnly(body.startDate) : existing.startDate;
-  const endDate = body.endDate ? parseDateOnly(body.endDate) : existing.endDate;
-  if (toDateOnly(endDate) <= toDateOnly(startDate)) {
+  const endDate =
+    body.endDate === null
+      ? null
+      : body.endDate
+        ? parseDateOnly(body.endDate)
+        : existing.endDate;
+  if (endDate && toDateOnly(endDate) <= toDateOnly(startDate)) {
     throw conflict("endDate must be after startDate");
   }
 

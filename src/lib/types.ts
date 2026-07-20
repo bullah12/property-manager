@@ -129,7 +129,7 @@ export interface TenancyDto {
   propertyId: string;
   tenantId: string;
   startDate: string;
-  endDate: string;
+  endDate: string | null;
   endedOn: string | null;
   rentAmountCents: number;
   rentDueDay: number;
@@ -176,7 +176,7 @@ export interface ContractDto {
   tenancy?: {
     id: string;
     startDate: string;
-    endDate: string;
+    endDate: string | null;
     status: TenancyStatus;
     tenant?: { id: string; fullName: string };
   };
@@ -216,6 +216,7 @@ export type ComplianceKind =
   | "electrical_eicr"
   | "epc"
   | "smoke_co_check"
+  | "selective_licence"
   | "inspection"
   | "insurance"
   | "custom";

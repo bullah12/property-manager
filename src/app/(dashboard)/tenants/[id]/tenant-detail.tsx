@@ -121,7 +121,7 @@ export function TenantDetail({ id }: { id: string }) {
                         <DateDisplay iso={t.startDate} />
                       </TableCell>
                       <TableCell>
-                        <DateDisplay iso={t.endDate} />
+                        {t.status === "active" ? "Rolling" : <DateDisplay iso={t.endedOn ?? t.endDate} />}
                       </TableCell>
                       <TableCell>
                         <Money cents={t.rentAmountCents} />

@@ -66,11 +66,9 @@ export async function syncComplianceReminder(db: Db, item: ComplianceItem) {
 
 /** Hook: after any tenancy create/update/transition (same transaction). */
 export async function syncTenancyReminder(db: Db, tenancy: Tenancy) {
-  if (tenancy.status === "draft" || tenancy.status === "active") {
-    await upsertReminder(db, "tenancy", tenancy.id, tenancy.endDate);
-  } else {
-    await deleteReminder(db, "tenancy", tenancy.id);
-  }
+  // Assured periodic tenancies do not expire, so there is no lease-expiry
+  // deadline to remind against. Actual endings are recorded in endedOn.
+  await deleteReminder(db, "tenancy", tenancy.id);
 }
 
 /** Reset a reminder's lead ladder after an explicit lead-days override. */

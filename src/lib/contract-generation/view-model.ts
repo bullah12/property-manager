@@ -3,25 +3,25 @@ import { z } from "zod";
 import { toDateOnly } from "@/lib/dates";
 
 /**
- * §5.4 step 2: the view model. ALL formatting happens here, never in the
- * template. The Zod schema for template version 'lease/v1' fails loudly on
- * any missing/empty field — a blank never renders.
+ * Version 2 is the standard England assured-periodic written statement used
+ * for tenancies created on or after 1 May 2026. It deliberately validates
+ * only information that is required or actually used in the agreement.
  */
-
-export const TEMPLATE_VERSION = "lease/v1";
+export const TEMPLATE_VERSION = "lease/v2";
 
 const nonEmpty = z.string().trim().min(1);
+const optionalText = z.string().trim().nullable();
 
-export const leaseV1Schema = z.object({
+export const leaseV2Schema = z.object({
   landlord: z.object({
     fullName: nonEmpty,
     address: nonEmpty,
-    phone: nonEmpty,
-    email: z.string().trim().pipe(z.email()),
+    phone: optionalText,
+    email: z.string().trim().pipe(z.email()).nullable(),
   }),
   tenant: z.object({
     fullName: nonEmpty,
-    phone: nonEmpty,
+    phone: optionalText,
     email: z.string().trim().pipe(z.email()).nullable(),
   }),
   property: z.object({ fullAddress: nonEmpty }),
@@ -30,29 +30,39 @@ export const leaseV1Schema = z.object({
     startDateIso: z.string().regex(/^\d{4}-\d{2}-\d{2}$/),
     rentAmountDisplay: nonEmpty,
     rentDueDayOrdinal: nonEmpty,
+    depositTaken: z.boolean(),
     depositAmountDisplay: nonEmpty,
-    depositSchemeName: nonEmpty,
-    depositReference: nonEmpty,
-    reletLevyDisplay: nonEmpty.optional(),
+    depositSchemeName: optionalText,
+    depositReference: optionalText,
   }),
   clauses: z
     .object({
       pets: z.boolean(),
       petsDescription: z.string().trim().optional(),
       garden: z.boolean(),
+      gasSafetyApplies: z.boolean(),
+      billsIncluded: z.boolean(),
+      billsDescription: z.string().trim().optional(),
     })
-    .refine((c) => !c.pets || (c.petsDescription && c.petsDescription.length > 0), {
-      message: "petsDescription is required when the pets clause is enabled",
+    .refine((value) => !value.pets || Boolean(value.petsDescription), {
+      message: "petsDescription is required when permission for a pet is recorded",
       path: ["petsDescription"],
+    })
+    .refine((value) => !value.billsIncluded || Boolean(value.billsDescription), {
+      message: "billsDescription is required when bills are included",
+      path: ["billsDescription"],
     }),
 });
 
-export type LeaseV1ViewModel = z.infer<typeof leaseV1Schema>;
+export type LeaseV2ViewModel = z.infer<typeof leaseV2Schema>;
 
 export interface ClauseInput {
   pets: boolean;
   petsDescription?: string;
   garden: boolean;
+  gasSafetyApplies?: boolean;
+  billsIncluded?: boolean;
+  billsDescription?: string;
 }
 
 const MONTHS = [
@@ -60,65 +70,10 @@ const MONTHS = [
   "July", "August", "September", "October", "November", "December",
 ];
 
-/** "1 September 2026" */
-export function formatDateLong(d: Date): string {
-  return `${d.getUTCDate()} ${MONTHS[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+export function formatDateLong(date: Date): string {
+  return `${date.getUTCDate()} ${MONTHS[date.getUTCMonth()]} ${date.getUTCFullYear()}`;
 }
 
-const ONES = [
-  "zero", "one", "two", "three", "four", "five", "six", "seven", "eight",
-  "nine", "ten", "eleven", "twelve", "thirteen", "fourteen", "fifteen",
-  "sixteen", "seventeen", "eighteen", "nineteen",
-];
-const TENS = [
-  "", "", "twenty", "thirty", "forty", "fifty", "sixty", "seventy", "eighty", "ninety",
-];
-
-/** Integer → British English words (supports 0..999,999,999). */
-export function numberToWords(n: number): string {
-  if (!Number.isInteger(n) || n < 0) throw new Error(`numberToWords: invalid ${n}`);
-  if (n < 20) return ONES[n];
-  if (n < 100) {
-    const tens = TENS[Math.floor(n / 10)];
-    return n % 10 ? `${tens}-${ONES[n % 10]}` : tens;
-  }
-  if (n < 1000) {
-    const rest = n % 100;
-    const head = `${ONES[Math.floor(n / 100)]} hundred`;
-    return rest ? `${head} and ${numberToWords(rest)}` : head;
-  }
-  const units: Array<[number, string]> = [
-    [1_000_000_000, "billion"],
-    [1_000_000, "million"],
-    [1_000, "thousand"],
-  ];
-  for (const [value, name] of units) {
-    if (n >= value) {
-      const head = `${numberToWords(Math.floor(n / value))} ${name}`;
-      const rest = n % value;
-      if (!rest) return head;
-      return rest < 100 ? `${head} and ${numberToWords(rest)}` : `${head} ${numberToWords(rest)}`;
-    }
-  }
-  throw new Error(`numberToWords: out of range ${n}`);
-}
-
-/** 95000 → "nine hundred and fifty pounds (£950.00)" */
-export function moneyLegal(cents: number): string {
-  const pounds = Math.floor(cents / 100);
-  const pence = cents % 100;
-  const poundsWords = `${numberToWords(pounds)} pound${pounds === 1 ? "" : "s"}`;
-  const words = pence
-    ? `${poundsWords} and ${numberToWords(pence)} pence`
-    : poundsWords;
-  const numeric = `£${(cents / 100).toLocaleString("en-GB", {
-    minimumFractionDigits: 2,
-    maximumFractionDigits: 2,
-  })}`;
-  return `${words} (${numeric})`;
-}
-
-/** 105000 → "£1,050.00" */
 export function moneyDisplay(cents: number): string {
   return `£${(cents / 100).toLocaleString("en-GB", {
     minimumFractionDigits: 2,
@@ -126,28 +81,13 @@ export function moneyDisplay(cents: number): string {
   })}`;
 }
 
-/** 1 → "1st", 2 → "2nd", 21 → "21st" */
-export function ordinal(n: number): string {
-  const mod100 = n % 100;
-  if (mod100 >= 11 && mod100 <= 13) return `${n}th`;
-  switch (n % 10) {
-    case 1: return `${n}st`;
-    case 2: return `${n}nd`;
-    case 3: return `${n}rd`;
-    default: return `${n}th`;
-  }
-}
-
-/** Whole months between two dates (term length), e.g. 1 Sep 26→31 Aug 27 = 12. */
-export function termMonths(start: Date, end: Date): number {
-  // end is the last day of the term; the term covers end+1day exclusive.
-  const endExclusive = new Date(end);
-  endExclusive.setUTCDate(endExclusive.getUTCDate() + 1);
-  let months =
-    (endExclusive.getUTCFullYear() - start.getUTCFullYear()) * 12 +
-    (endExclusive.getUTCMonth() - start.getUTCMonth());
-  if (endExclusive.getUTCDate() < start.getUTCDate()) months -= 1;
-  return Math.max(months, 1);
+export function ordinal(value: number): string {
+  const mod100 = value % 100;
+  if (mod100 >= 11 && mod100 <= 13) return `${value}th`;
+  if (value % 10 === 1) return `${value}st`;
+  if (value % 10 === 2) return `${value}nd`;
+  if (value % 10 === 3) return `${value}rd`;
+  return `${value}th`;
 }
 
 export function buildLeaseViewModel(opts: {
@@ -157,9 +97,8 @@ export function buildLeaseViewModel(opts: {
   tenancy: Tenancy;
   tenant: Tenant;
   clauses: ClauseInput;
-  reletLevyCents?: number;
-}): LeaseV1ViewModel {
-  const { owner, settings, property, tenancy, tenant, clauses, reletLevyCents } = opts;
+}): LeaseV2ViewModel {
+  const { owner, settings, property, tenancy, tenant, clauses } = opts;
   const propertyAddress = [
     property.addressLine1,
     property.addressLine2,
@@ -169,17 +108,18 @@ export function buildLeaseViewModel(opts: {
   ]
     .filter(Boolean)
     .join(", ");
+  const depositTaken = tenancy.depositAmountCents != null && tenancy.depositAmountCents > 0;
 
   const candidate = {
     landlord: {
       fullName: owner.displayName,
       address: settings.landlordAddress ?? "",
-      phone: settings.landlordPhone ?? "",
+      phone: settings.landlordPhone,
       email: owner.email,
     },
     tenant: {
       fullName: tenant.fullName,
-      phone: tenant.phone ?? "",
+      phone: tenant.phone,
       email: tenant.email,
     },
     property: { fullAddress: propertyAddress },
@@ -188,27 +128,30 @@ export function buildLeaseViewModel(opts: {
       startDateIso: toDateOnly(tenancy.startDate),
       rentAmountDisplay: moneyDisplay(tenancy.rentAmountCents),
       rentDueDayOrdinal: ordinal(tenancy.rentDueDay),
-      depositAmountDisplay:
-        tenancy.depositAmountCents != null ? moneyDisplay(tenancy.depositAmountCents) : "",
-      depositSchemeName: tenancy.depositScheme ?? "",
-      depositReference: tenancy.depositReference ?? "",
-      ...(reletLevyCents != null ? { reletLevyDisplay: moneyDisplay(reletLevyCents) } : {}),
+      depositTaken,
+      depositAmountDisplay: depositTaken
+        ? moneyDisplay(tenancy.depositAmountCents!)
+        : "No tenancy deposit",
+      depositSchemeName: tenancy.depositScheme,
+      depositReference: tenancy.depositReference,
     },
     clauses: {
       pets: clauses.pets,
-      ...(clauses.pets ? { petsDescription: clauses.petsDescription } : {}),
+      ...(clauses.petsDescription ? { petsDescription: clauses.petsDescription } : {}),
       garden: clauses.garden,
+      gasSafetyApplies: clauses.gasSafetyApplies ?? true,
+      billsIncluded: clauses.billsIncluded ?? false,
+      ...(clauses.billsDescription ? { billsDescription: clauses.billsDescription } : {}),
     },
   };
 
-  const result = leaseV1Schema.safeParse(candidate);
+  const result = leaseV2Schema.safeParse(candidate);
   if (!result.success) {
     const issues = result.error.issues
-      .map((i) => `${i.path.join(".")}: ${i.message}`)
+      .map((issue) => `${issue.path.join(".")}: ${issue.message}`)
       .join("; ");
     throw new Error(
-      `lease/v1 view model validation failed (tenancy ${tenancy.id}, ` +
-        `dates ${toDateOnly(tenancy.startDate)}–${toDateOnly(tenancy.endDate)}): ${issues}`
+      `lease/v2 view model validation failed (tenancy ${tenancy.id}, start ${toDateOnly(tenancy.startDate)}): ${issues}`
     );
   }
   return result.data;

@@ -49,7 +49,6 @@ const formSchema = z.object({
   ]),
   newTenantPhone: z.string().trim().max(50),
   startDate: z.string().min(1, "Required"),
-  endDate: z.string().min(1, "Required"),
   rentAmount: z.string().regex(/^\d+(\.\d{1,2})?$/, "Amount in pounds, e.g. 950.00"),
   rentDueDay: z.string().regex(/^\d+$/, "Day of month 1–28"),
   depositAmount: z.string().regex(/^(\d+(\.\d{1,2})?)?$/, "Amount in pounds"),
@@ -95,7 +94,6 @@ export function TenancyForm({ initialPropertyId, tenancy }: TenancyFormProps) {
       newTenantEmail: "",
       newTenantPhone: "",
       startDate: tenancy?.startDate ?? "",
-      endDate: tenancy?.endDate ?? "",
       rentAmount: tenancy ? (tenancy.rentAmountCents / 100).toFixed(2) : "",
       rentDueDay: tenancy ? String(tenancy.rentDueDay) : "1",
       depositAmount:
@@ -114,9 +112,6 @@ export function TenancyForm({ initialPropertyId, tenancy }: TenancyFormProps) {
   const mutation = useMutation({
     mutationFn: async (values: FormValues) => {
       setError(null);
-      if (values.endDate <= values.startDate) {
-        throw new ApiClientError("VALIDATION_ERROR", "End date must be after start date");
-      }
       const rentDueDay = parseInt(values.rentDueDay, 10);
       if (rentDueDay < 1 || rentDueDay > 28) {
         throw new ApiClientError("VALIDATION_ERROR", "Rent due day must be between 1 and 28");
@@ -140,7 +135,7 @@ export function TenancyForm({ initialPropertyId, tenancy }: TenancyFormProps) {
 
       const shared = {
         startDate: values.startDate,
-        endDate: values.endDate,
+        endDate: null,
         rentAmountCents: Math.round(parseFloat(values.rentAmount) * 100),
         rentDueDay,
         depositAmountCents:
@@ -325,19 +320,13 @@ export function TenancyForm({ initialPropertyId, tenancy }: TenancyFormProps) {
                   </FormItem>
                 )}
               />
-              <FormField
-                control={form.control}
-                name="endDate"
-                render={({ field }) => (
-                  <FormItem>
-                    <FormLabel>End date</FormLabel>
-                    <FormControl>
-                      <Input type="date" {...field} />
-                    </FormControl>
-                    <FormMessage />
-                  </FormItem>
-                )}
-              />
+              <div className="rounded-md border bg-muted/30 p-3 text-sm">
+                <div className="font-medium">Rolling monthly tenancy</div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  New assured tenancies in England cannot have a fixed end date. Record the
+                  actual end when the tenancy lawfully finishes.
+                </p>
+              </div>
               <FormField
                 control={form.control}
                 name="rentAmount"

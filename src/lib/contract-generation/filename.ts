@@ -1,4 +1,4 @@
-import type { LeaseV1ViewModel } from "./view-model";
+import type { LeaseV2ViewModel } from "./view-model";
 
 function filenamePart(value: string): string {
   return value
@@ -8,7 +8,7 @@ function filenamePart(value: string): string {
     .replace(/^-+|-+$/g, "") || "Unknown";
 }
 
-export function buildGeneratedLeaseFilename(viewModel: LeaseV1ViewModel): string {
+export function buildGeneratedLeaseFilename(viewModel: LeaseV2ViewModel): string {
   return [
     "Tenancy_Agreement",
     filenamePart(viewModel.landlord.fullName),

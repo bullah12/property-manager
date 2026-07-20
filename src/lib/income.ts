@@ -20,7 +20,7 @@ export interface RentPeriod {
 
 type RentTerm = Pick<
   Tenancy,
-  "startDate" | "endDate" | "endedOn" | "rentDueDay" | "rentAmountCents"
+  "startDate" | "endDate" | "endedOn" | "rentDueDay" | "rentAmountCents" | "status"
 >;
 
 export function deriveRentPeriods(
@@ -28,10 +28,12 @@ export function deriveRentPeriods(
   year: number
 ): RentPeriod[] {
   const start = tenancy.startDate;
+  const yearEnd = parseDateOnly(`${year}-12-31`);
   const end =
-    tenancy.endedOn && tenancy.endedOn < tenancy.endDate
-      ? tenancy.endedOn
-      : tenancy.endDate;
+    tenancy.endedOn ??
+    (tenancy.status === "active" || tenancy.status === "draft"
+      ? yearEnd
+      : tenancy.endDate ?? yearEnd);
   const from = new Date(
     Math.max(firstOfMonth(start).getTime(), Date.UTC(year, 0, 1))
   );
@@ -89,7 +91,7 @@ export interface IncomeRow {
     id: string;
     status: string;
     startDate: string;
-    endDate: string;
+    endDate: string | null;
     endedOn: string | null;
     rentAmountCents: number;
     rentDueDay: number;
@@ -128,7 +130,8 @@ export async function computeIncomeGrid(opts: {
       propertyId,
       startDate: { lte: yearEnd },
       OR: [
-        { status: { in: ["active", "renewed"] }, endDate: { gte: yearStart } },
+        { status: "active" },
+        { status: "renewed", endDate: { gte: yearStart } },
         { status: "ended", endedOn: { gte: yearStart } },
       ],
     },
@@ -201,7 +204,7 @@ export async function computeIncomeGrid(opts: {
         id: t.id,
         status: t.status,
         startDate: toDateOnly(t.startDate),
-        endDate: toDateOnly(t.endDate),
+        endDate: t.endDate ? toDateOnly(t.endDate) : null,
         endedOn: t.endedOn ? toDateOnly(t.endedOn) : null,
         rentAmountCents: t.rentAmountCents,
         rentDueDay: t.rentDueDay,

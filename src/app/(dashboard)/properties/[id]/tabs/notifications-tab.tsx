@@ -3,6 +3,8 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CalendarClock,
+  BadgeCheck,
+  ExternalLink,
   FileCheck,
   Flame,
   Home,
@@ -60,6 +62,7 @@ const KIND_META: Record<ComplianceKind, { label: string; icon: React.ReactNode; 
   electrical_eicr: { label: "Electrical EICR", icon: <Zap className="size-4" />, recurrence: 60 },
   epc: { label: "EPC", icon: <FileCheck className="size-4" />, recurrence: 120 },
   smoke_co_check: { label: "Smoke & CO check", icon: <ShieldCheck className="size-4" />, recurrence: 12 },
+  selective_licence: { label: "Selective licence", icon: <BadgeCheck className="size-4" />, recurrence: null },
   inspection: { label: "Inspection", icon: <Home className="size-4" />, recurrence: null },
   insurance: { label: "Insurance", icon: <ShieldCheck className="size-4" />, recurrence: 12 },
   custom: { label: "Custom", icon: <CalendarClock className="size-4" />, recurrence: null },
@@ -150,8 +153,7 @@ export function NotificationsTab({ property }: { property: PropertyDetailDto }) 
               <CardTitle className="text-base">Compliance & deadlines</CardTitle>
               <CardDescription>
                 Certificates, inspections and other dated obligations for this
-                property. Reminders fire at each item&apos;s lead days (Phase 8
-                delivers them).
+                property, including local selective licensing where it applies.
               </CardDescription>
             </div>
             <Button size="sm" onClick={() => setAddOpen(true)}>
@@ -336,7 +338,10 @@ function AddItemDialog({
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Add compliance item</DialogTitle>
-          <DialogDescription>Kind presets fill the usual UK cadence.</DialogDescription>
+          <DialogDescription>
+            Kind presets fill common cadences. Selective-licence expiry and renewal
+            rules come from the council that issued it.
+          </DialogDescription>
         </DialogHeader>
         <div className="space-y-4">
           <div className="space-y-2">
@@ -353,6 +358,19 @@ function AddItemDialog({
                 ))}
               </SelectContent>
             </Select>
+            {kind === "selective_licence" ? (
+              <p className="text-xs text-muted-foreground">
+                Licensing areas and conditions are council-specific. {" "}
+                <a
+                  href="https://www.gov.uk/find-local-council"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-flex items-center gap-1 underline"
+                >
+                  Find the property&apos;s council <ExternalLink className="size-3" />
+                </a>
+              </p>
+            ) : null}
           </div>
           <div className="space-y-2">
             <Label htmlFor="ci-label">Label</Label>
@@ -388,7 +406,7 @@ function AddItemDialog({
   );
 }
 
-/** Flow 1: after property create — UK-default presets (gas 12 / EICR 60 / EPC 120). */
+/** Flow 1: after property create — England presets (gas 12 / EICR 60 / EPC 120). */
 function UkDefaultsDialog({
   open,
   onOpenChange,
@@ -442,7 +460,7 @@ function UkDefaultsDialog({
         <DialogHeader>
           <DialogTitle>Add compliance items?</DialogTitle>
           <DialogDescription>
-            Standard UK obligations for {propertyNickname}. Adjust each first due
+            Common England obligations for {propertyNickname}. Adjust each first due
             date — the certificate&apos;s current expiry is the right value.
           </DialogDescription>
         </DialogHeader>

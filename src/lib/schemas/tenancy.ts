@@ -18,7 +18,7 @@ const tenancyFields = z.object({
   propertyId: z.uuid(),
   tenantId: z.uuid(),
   startDate: dateOnly,
-  endDate: dateOnly,
+  endDate: dateOnly.nullish(),
   rentAmountCents: z.number().int().positive(),
   rentDueDay: z.number().int().min(1).max(28),
   depositAmountCents: z.number().int().min(0).nullish(),
@@ -27,7 +27,7 @@ const tenancyFields = z.object({
 });
 
 export const createTenancySchema = tenancyFields.refine(
-  (o) => o.endDate > o.startDate,
+  (o) => !o.endDate || o.endDate > o.startDate,
   { message: "endDate must be after startDate", path: ["endDate"] }
 );
 
@@ -36,7 +36,7 @@ export const patchTenancySchema = tenancyFields
   .partial()
   .refine((o) => Object.keys(o).length > 0, "at least one field is required");
 
-/** Renew: successor draft pre-filled from the predecessor; all overridable. */
+/** Legacy renew endpoint input; the endpoint now returns a compliance-safe conflict. */
 export const renewTenancySchema = tenancyFields
   .omit({ propertyId: true, tenantId: true })
   .partial();

@@ -9,15 +9,16 @@ const baseTenancy = {
   endedOn: null,
   rentDueDay: 1,
   rentAmountCents: 95_000,
+  status: "active",
 };
 
-test("an active tenancy expects rent through its contractual term", () => {
+test("an active assured periodic tenancy expects rent through the reporting year", () => {
   assert.equal(deriveRentPeriods(baseTenancy, 2026).length, 12);
 });
 
 test("an early-ended tenancy stops expecting rent after endedOn", () => {
   const periods = deriveRentPeriods(
-    { ...baseTenancy, endedOn: parseDateOnly("2026-03-15") },
+    { ...baseTenancy, status: "ended", endedOn: parseDateOnly("2026-03-15") },
     2026
   );
 
@@ -36,6 +37,7 @@ test("a tenancy cancelled before it starts creates no rent expectations", () => 
     {
       ...baseTenancy,
       startDate: parseDateOnly("2026-08-01"),
+      status: "ended",
       endedOn: parseDateOnly("2026-07-19"),
     },
     2026

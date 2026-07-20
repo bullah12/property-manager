@@ -104,7 +104,7 @@ export function serializeTenancy(
     propertyId: t.propertyId,
     tenantId: t.tenantId,
     startDate: toDateOnly(t.startDate),
-    endDate: toDateOnly(t.endDate),
+    endDate: t.endDate ? toDateOnly(t.endDate) : null,
     endedOn: t.endedOn ? toDateOnly(t.endedOn) : null,
     rentAmountCents: t.rentAmountCents,
     rentDueDay: t.rentDueDay,
@@ -157,7 +157,7 @@ export function serializeContract(
           tenancy: {
             id: c.tenancy.id,
             startDate: toDateOnly(c.tenancy.startDate),
-            endDate: toDateOnly(c.tenancy.endDate),
+            endDate: c.tenancy.endDate ? toDateOnly(c.tenancy.endDate) : null,
             status: c.tenancy.status,
             ...(c.tenancy.tenant
               ? { tenant: { id: c.tenancy.tenant.id, fullName: c.tenancy.tenant.fullName } }
