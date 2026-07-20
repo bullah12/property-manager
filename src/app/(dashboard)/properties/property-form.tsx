@@ -147,7 +147,8 @@ export function PropertyForm({ property }: { property?: PropertyDto }) {
             address: owner.address,
             phone: owner.phone || null,
             email: owner.email || null,
-            ownershipPercentage: Number(owner.ownershipPercentage),
+            ownershipPercentage:
+              values.ownershipMode === "sole" ? 100 : Number(owner.ownershipPercentage),
             isMainLandlord: owner.isMainLandlord,
           })),
         },
@@ -372,13 +373,21 @@ export function PropertyForm({ property }: { property?: PropertyDto }) {
                           </Button>
                         ) : null}
                       </div>
-                      <div className="grid gap-4 sm:grid-cols-2">
+                      <div
+                        className={
+                          form.watch("ownershipMode") === "shared"
+                            ? "grid gap-4 sm:grid-cols-2"
+                            : "grid gap-4"
+                        }
+                      >
                         <FormField control={form.control} name={`owners.${index}.fullName`} render={({ field }) => (
                           <FormItem><FormLabel>Full legal name</FormLabel><FormControl><Input {...field} placeholder="Individual or company" /></FormControl><FormMessage /></FormItem>
                         )} />
-                        <FormField control={form.control} name={`owners.${index}.ownershipPercentage`} render={({ field }) => (
-                          <FormItem><FormLabel>Ownership %</FormLabel><FormControl><Input inputMode="decimal" {...field} /></FormControl><FormMessage /></FormItem>
-                        )} />
+                        {form.watch("ownershipMode") === "shared" ? (
+                          <FormField control={form.control} name={`owners.${index}.ownershipPercentage`} render={({ field }) => (
+                            <FormItem><FormLabel>Ownership %</FormLabel><FormControl><Input inputMode="decimal" {...field} /></FormControl><FormMessage /></FormItem>
+                          )} />
+                        ) : null}
                       </div>
                       <FormField control={form.control} name={`owners.${index}.address`} render={({ field }) => (
                         <FormItem><FormLabel>Address for service of notices</FormLabel><FormControl><Input {...field} placeholder="Postal address in England or Wales" /></FormControl><FormMessage /></FormItem>
