@@ -18,7 +18,8 @@
     "test:golden": "tsx tests/golden-lease.test.ts",
     "test:income": "tsx --test tests/income.test.ts",
     "test:workspace": "tsx --test tests/workspace-isolation.test.ts",
-    "test:ownership": "tsx --test tests/property-ownership.test.ts"
+    "test:ownership": "tsx --test tests/property-ownership.test.ts",
+    "test:investment": "tsx --test tests/investment.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",

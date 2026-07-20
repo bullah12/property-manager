@@ -36,6 +36,7 @@ model File {
   ownershipEventDocuments   OwnershipEvent[]    @relation("OwnershipEventDocument")
   ownershipPaymentDocuments OwnershipPayment[]  @relation("OwnershipPaymentDocument")
   ownershipNoteDocuments    OwnershipNote[]     @relation("OwnershipNoteDocument")
+  propertyValuationEvidence PropertyValuation[] @relation("PropertyValuationEvidence")
 
   @@unique([id, workspaceId], map: "uq_files_id_workspace")
   @@index([ownerId], map: "idx_files_owner_id")
@@ -83,6 +84,7 @@ model User {
   workspaceMemberships    WorkspaceMembership[]
   recordedOwnershipEvents OwnershipEvent[]      @relation("OwnershipEventRecorder")
   authoredOwnershipNotes  OwnershipNote[]       @relation("OwnershipNoteAuthor")
+  createdInvestmentEntries OwnerInvestmentEntry[] @relation("InvestmentEntryCreator")
 
   @@map("users")
 }
@@ -114,6 +116,13 @@ model Workspace {
   ownershipPayments         OwnershipPayment[]
   ownershipNotes            OwnershipNote[]
   ownershipEventAllocations OwnershipEventAllocation[]
+  acquisitionCosts          AcquisitionCost[]
+  ownerInvestmentEntries    OwnerInvestmentEntry[]
+  propertyLoans             PropertyLoan[]
+  loanEvents                LoanEvent[]
+  propertyValuations        PropertyValuation[]
+  investmentForecasts       InvestmentForecast[]
+  plannedInvestmentCosts    PlannedInvestmentCost[]
 
   @@map("workspaces")
 }
@@ -146,6 +155,7 @@ model Property {
   propertyType       String   @map("property_type")
   bedrooms           Int?
   purchasePriceCents Int?     @map("purchase_price_cents")
+  purchaseCompletionDate DateTime? @map("purchase_completion_date") @db.Date
   notes              String?
   status             String   @default("active")
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
@@ -157,6 +167,12 @@ model Property {
   ownershipEvents   OwnershipEvent[]
   ownershipPayments OwnershipPayment[]
   ownershipNotes    OwnershipNote[]
+  acquisitionCosts  AcquisitionCost[]
+  ownerInvestmentEntries OwnerInvestmentEntry[]
+  loans             PropertyLoan[]
+  valuations        PropertyValuation[]
+  investmentForecast InvestmentForecast?
+  plannedInvestmentCosts PlannedInvestmentCost[]
   workspace         Workspace          @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([id, workspaceId], map: "uq_properties_id_workspace")
@@ -184,6 +200,8 @@ model Owner {
   paymentsMade     OwnershipPayment[]         @relation("OwnershipPaymentPayer")
   paymentsReceived OwnershipPayment[]         @relation("OwnershipPaymentRecipient")
   ownershipNotes   OwnershipNote[]
+  acquisitionCosts AcquisitionCost[]
+  investmentEntries OwnerInvestmentEntry[]
 
   @@unique([id, workspaceId], map: "uq_owners_id_workspace")
   @@index([workspaceId, fullName], map: "idx_owners_workspace_name")
@@ -315,6 +333,160 @@ model OwnershipNote {
 
   @@index([workspaceId, propertyId, noteDate(sort: Desc)], map: "idx_ownership_notes_property_date")
   @@map("ownership_notes")
+}
+
+// ---- 0019_investment_performance ----
+
+model AcquisitionCost {
+  id            String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId   String   @map("workspace_id") @db.Uuid
+  propertyId    String   @map("property_id") @db.Uuid
+  category      String
+  amountCents   BigInt   @map("amount_cents")
+  occurredOn    DateTime @map("occurred_on") @db.Date
+  fundingSource String   @map("funding_source")
+  ownerId       String?  @map("owner_id") @db.Uuid
+  description   String?
+  createdAt     DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspace     Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  property      Property @relation(fields: [propertyId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  owner         Owner? @relation(fields: [ownerId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, propertyId, occurredOn], map: "idx_acquisition_costs_workspace_property_date")
+  @@map("acquisition_costs")
+}
+
+model OwnerInvestmentEntry {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  propertyId  String   @map("property_id") @db.Uuid
+  ownerId     String   @map("owner_id") @db.Uuid
+  entryType   String   @map("entry_type")
+  amountCents BigInt   @map("amount_cents")
+  occurredOn  DateTime @map("occurred_on") @db.Date
+  description String?
+  reason      String?
+  createdBy   String?  @map("created_by") @db.Uuid
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  property    Property @relation(fields: [propertyId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  owner       Owner @relation(fields: [ownerId, workspaceId], references: [id, workspaceId], onDelete: Restrict)
+  creator     User? @relation("InvestmentEntryCreator", fields: [createdBy], references: [id], onDelete: SetNull)
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, propertyId, occurredOn], map: "idx_owner_investment_workspace_property_date")
+  @@index([workspaceId, ownerId, occurredOn], map: "idx_owner_investment_workspace_owner_date")
+  @@map("owner_investment_entries")
+}
+
+model PropertyLoan {
+  id                   String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId          String   @map("workspace_id") @db.Uuid
+  propertyId           String   @map("property_id") @db.Uuid
+  lender               String?
+  name                 String
+  originalBalanceCents BigInt   @map("original_balance_cents")
+  openingBalanceCents  BigInt   @map("opening_balance_cents")
+  interestRateBps      Int?     @map("interest_rate_bps")
+  repaymentType        String   @map("repayment_type")
+  monthlyPaymentCents  BigInt?  @map("monthly_payment_cents")
+  startedOn            DateTime @map("started_on") @db.Date
+  endsOn               DateTime? @map("ends_on") @db.Date
+  secured              Boolean  @default(true)
+  notes                String?
+  createdAt            DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt            DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspace            Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  property             Property @relation(fields: [propertyId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  events               LoanEvent[]
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, propertyId], map: "idx_property_loans_workspace_property")
+  @@map("property_loans")
+}
+
+model LoanEvent {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  loanId      String   @map("loan_id") @db.Uuid
+  eventType   String   @map("event_type")
+  amountCents BigInt   @map("amount_cents")
+  occurredOn  DateTime @map("occurred_on") @db.Date
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  loan        PropertyLoan @relation(fields: [loanId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, loanId, occurredOn], map: "idx_loan_events_workspace_loan_date")
+  @@map("loan_events")
+}
+
+model PropertyValuation {
+  id             String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId    String   @map("workspace_id") @db.Uuid
+  propertyId     String   @map("property_id") @db.Uuid
+  valueCents     BigInt   @map("value_cents")
+  valuedOn       DateTime @map("valued_on") @db.Date
+  source         String
+  notes          String?
+  evidenceFileId String?  @map("evidence_file_id") @db.Uuid
+  createdAt      DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt      DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspace      Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  property       Property @relation(fields: [propertyId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+  evidenceFile   File? @relation("PropertyValuationEvidence", fields: [evidenceFileId, workspaceId], references: [id, workspaceId], onDelete: NoAction)
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, propertyId, valuedOn(sort: Desc)], map: "idx_property_valuations_workspace_property_date")
+  @@map("property_valuations")
+}
+
+model InvestmentForecast {
+  id                       String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId              String   @map("workspace_id") @db.Uuid
+  propertyId               String   @map("property_id") @db.Uuid
+  expectedMonthlyRentCents BigInt?  @map("expected_monthly_rent_cents")
+  rentGrowthBps            Int?     @map("rent_growth_bps")
+  occupancyBps             Int?     @map("occupancy_bps")
+  expenseInflationBps      Int?     @map("expense_inflation_bps")
+  appreciationBps          Int?     @map("appreciation_bps")
+  mortgageInterestBps      Int?     @map("mortgage_interest_bps")
+  monthlyRepaymentCents    BigInt?  @map("monthly_repayment_cents")
+  horizonMonths            Int      @default(60) @map("horizon_months")
+  targetReturnBps          Int?     @map("target_return_bps")
+  targetRecoveryDate       DateTime? @map("target_recovery_date") @db.Date
+  targetLtvBps             Int?     @map("target_ltv_bps")
+  createdAt                DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt                DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspace                Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  property                 Property @relation(fields: [propertyId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+
+  @@unique([propertyId, workspaceId])
+  @@unique([id, workspaceId])
+  @@map("investment_forecasts")
+}
+
+model PlannedInvestmentCost {
+  id          String   @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  workspaceId String   @map("workspace_id") @db.Uuid
+  propertyId  String   @map("property_id") @db.Uuid
+  category    String
+  amountCents BigInt   @map("amount_cents")
+  plannedOn   DateTime @map("planned_on") @db.Date
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at") @db.Timestamptz(6)
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  property    Property @relation(fields: [propertyId, workspaceId], references: [id, workspaceId], onDelete: Cascade)
+
+  @@unique([id, workspaceId])
+  @@index([workspaceId, propertyId, plannedOn], map: "idx_planned_costs_workspace_property_date")
+  @@map("planned_investment_costs")
 }
 
 // ---- 0003_tenants_tenancies ----

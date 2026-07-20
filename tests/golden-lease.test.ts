@@ -47,6 +47,7 @@ const fixture = buildLeaseViewModel({
     propertyType: "house",
     bedrooms: 3,
     purchasePriceCents: null,
+    purchaseCompletionDate: null,
     notes: null,
     status: "active",
     createdAt: new Date("2026-01-01T00:00:00Z"),

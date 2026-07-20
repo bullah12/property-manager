@@ -668,6 +668,40 @@ async function seedRentPayments() {
   console.log(`Seeded ${rows.length} rent payments (paid/partial/overdue months)`);
 }
 
+async function seedInvestmentPerformance(adminId: string) {
+  const workspaceId = requireWorkspaceId();
+  const propertyId = SEED_IDS.houseProperty;
+  const ownerId = SEED_IDS.houseProperty; // seedProperties uses the property UUID for its opening owner
+  await prisma.property.update({ where: { id: propertyId }, data: { purchaseCompletionDate: new Date("2021-06-18T00:00:00Z") } });
+  await prisma.ownerInvestmentEntry.upsert({
+    where: { id: "efefefef-efef-4fef-8fef-efefefefef01" },
+    update: {},
+    create: { id: "efefefef-efef-4fef-8fef-efefefefef01", workspaceId, propertyId, ownerId, entryType: "initial_contribution", amountCents: BigInt(6200000), occurredOn: new Date("2021-06-18T00:00:00Z"), createdBy: adminId },
+  });
+  await prisma.acquisitionCost.upsert({
+    where: { id: "dededede-dede-4ede-8ede-dedededede01" },
+    update: {},
+    create: { id: "dededede-dede-4ede-8ede-dedededede01", workspaceId, propertyId, ownerId, category: "deposit", amountCents: BigInt(6200000), occurredOn: new Date("2021-06-18T00:00:00Z"), fundingSource: "owner" },
+  });
+  await prisma.propertyLoan.upsert({
+    where: { id: "bcbcbcbc-bcbc-4cbc-8cbc-bcbcbcbcbc01" },
+    update: {},
+    create: { id: "bcbcbcbc-bcbc-4cbc-8cbc-bcbcbcbcbc01", workspaceId, propertyId, name: "Maple repayment mortgage", lender: "Example Building Society", originalBalanceCents: BigInt(18375000), openingBalanceCents: BigInt(18375000), interestRateBps: 425, repaymentType: "repayment", monthlyPaymentCents: BigInt(103500), startedOn: new Date("2021-06-18T00:00:00Z") },
+  });
+  for (const [id, valueCents, date, source] of [
+    ["acacacac-acac-4cac-8cac-acacacacac01", 24500000, "2021-06-18", "purchase"],
+    ["acacacac-acac-4cac-8cac-acacacacac02", 28600000, "2026-06-30", "estimated"],
+  ] as const) {
+    await prisma.propertyValuation.upsert({ where: { id }, update: {}, create: { id, workspaceId, propertyId, valueCents: BigInt(valueCents), valuedOn: new Date(`${date}T00:00:00Z`), source } });
+  }
+  await prisma.investmentForecast.upsert({
+    where: { propertyId_workspaceId: { propertyId, workspaceId } },
+    update: {},
+    create: { workspaceId, propertyId, expectedMonthlyRentCents: BigInt(102500), rentGrowthBps: 250, occupancyBps: 9500, expenseInflationBps: 300, appreciationBps: 200, monthlyRepaymentCents: BigInt(103500), horizonMonths: 60, targetReturnBps: 400, targetLtvBps: 7500 },
+  });
+  console.log("Seeded Maple House investment performance records");
+}
+
 async function seedComplianceAndReminders(adminId: string) {
   // Attach last year's gas certificate scan to the overdue item.
   const certPdf = makePdf("Gas Safety Record - Maple House - 2025");
@@ -857,6 +891,7 @@ async function main() {
     await seedContracts(adminId);
     await seedExpenses(adminId);
     await seedRentPayments();
+    await seedInvestmentPerformance(adminId);
     await seedComplianceAndReminders(adminId);
     await seedNotificationsAndJobs(adminId);
   });

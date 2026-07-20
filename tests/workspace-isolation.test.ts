@@ -40,6 +40,22 @@ test("owners and ownership allocations are workspace scoped", () => {
   assert.equal(ownershipArgs.where.workspaceId, A);
 });
 
+test("investment records are workspace scoped", () => {
+  for (const model of [
+    "AcquisitionCost",
+    "OwnerInvestmentEntry",
+    "PropertyLoan",
+    "LoanEvent",
+    "PropertyValuation",
+    "InvestmentForecast",
+    "PlannedInvestmentCost",
+  ]) {
+    const args = { where: { propertyId: "property", workspaceId: B } };
+    scopeWorkspaceArgs(model, "findMany", args, A);
+    assert.equal(args.where.workspaceId, A, `${model} was not scoped`);
+  }
+});
+
 test("identity and membership models are only scoped explicitly", () => {
   const args = { where: { id: "user" } };
   scopeWorkspaceArgs("User", "findUnique", args, A);
