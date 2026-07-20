@@ -3,11 +3,20 @@ import { dateOnly } from "@/lib/schemas/tenancy";
 
 const cents = z.number().int().positive();
 const optionalText = z.string().trim().max(2000).nullish();
+const investmentDateOnly = dateOnly.refine((value) => {
+  const parsed = new Date(`${value}T00:00:00Z`);
+  return !Number.isNaN(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}, "Expected a valid calendar date");
 
 export const investmentQuerySchema = z.object({
   preset: z.enum(["this_month", "tax_year", "calendar_year", "last_12_months", "since_purchase", "custom"]).default("since_purchase"),
-  from: dateOnly.optional(),
-  to: dateOnly.optional(),
+  from: investmentDateOnly.optional(),
+  to: investmentDateOnly.optional(),
+}).superRefine((value, context) => {
+  if (value.preset !== "custom") return;
+  if (!value.from) context.addIssue({ code: "custom", path: ["from"], message: "from is required for a custom range" });
+  if (!value.to) context.addIssue({ code: "custom", path: ["to"], message: "to is required for a custom range" });
+  if (value.from && value.to && value.from > value.to) context.addIssue({ code: "custom", path: ["to"], message: "to must be on or after from" });
 });
 
 const acquisition = z.object({

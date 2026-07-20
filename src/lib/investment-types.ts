@@ -67,3 +67,36 @@ export interface InvestmentDashboardDto {
   issues: Array<{ severity: "warning" | "error"; code: string; message: string }>;
   disclaimer: string;
 }
+
+export interface PortfolioMetricDto {
+  valueCents: number | null;
+  includedProperties: number;
+  missingProperties: number;
+}
+
+export interface PortfolioInvestmentSummaryDto {
+  range: { from: string; to: string; preset: string };
+  accountingBasis: "cash";
+  propertiesRepresented: number;
+  properties: Array<{
+    id: string;
+    nickname: string;
+    address: string;
+    status: "active" | "archived";
+    hasInvestmentData: boolean;
+  }>;
+  metrics: {
+    currentValue: PortfolioMetricDto;
+    mortgageBalance: PortfolioMetricDto;
+    equity: PortfolioMetricDto;
+    cashInvested: PortfolioMetricDto;
+    grossRentalIncome: PortfolioMetricDto;
+    netOperatingIncome: PortfolioMetricDto;
+    netCashFlow: PortfolioMetricDto;
+  };
+  ratios: {
+    ltv: { valueBps: number | null; includedProperties: number; missingProperties: number };
+    grossYield: { valueBps: number | null; includedProperties: number; missingProperties: number };
+  };
+  warnings: string[];
+}

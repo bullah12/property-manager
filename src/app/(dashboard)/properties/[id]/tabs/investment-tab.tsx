@@ -21,11 +21,6 @@ import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/comp
 import { api, ApiClientError } from "@/lib/api-client";
 import type { InvestmentDashboardDto } from "@/lib/investment-types";
 
-const PRESETS = [
-  ["this_month", "This month"], ["tax_year", "This tax year"], ["calendar_year", "This calendar year"],
-  ["last_12_months", "Last 12 months"], ["since_purchase", "Since purchase"], ["custom", "Custom"],
-] as const;
-
 type RecordKind = "owner" | "ownership" | "acquisition" | "acquisition_cost" | "ledger" | "valuation" | "loan" | "loan_event" | "forecast" | "planned_cost";
 
 const RECORD_LABELS: Record<RecordKind, string> = {
@@ -33,17 +28,19 @@ const RECORD_LABELS: Record<RecordKind, string> = {
   ledger: "Contribution or distribution", valuation: "Valuation", loan: "Mortgage / loan", loan_event: "Loan event", forecast: "Forecast assumptions", planned_cost: "Planned one-off cost",
 };
 
-export function InvestmentTab({ propertyId }: { propertyId: string }) {
+export function SelectedPropertyInvestmentDashboard({
+  propertyId,
+  range,
+}: {
+  propertyId: string;
+  range: { from: string; to: string };
+}) {
   const queryClient = useQueryClient();
-  const [preset, setPreset] = useState("since_purchase");
-  const [from, setFrom] = useState("");
-  const [to, setTo] = useState("");
   const [recordKind, setRecordKind] = useState<RecordKind | null>(null);
   const [transactionType, setTransactionType] = useState("all");
   const [ownerFilter, setOwnerFilter] = useState("all");
-  const params = new URLSearchParams({ preset });
-  if (preset === "custom" && from && to) { params.set("from", from); params.set("to", to); }
-  const queryKey = ["investment", propertyId, params.toString()];
+  const params = new URLSearchParams({ preset: "custom", from: range.from, to: range.to });
+  const queryKey = ["investment", propertyId, range.from, range.to];
   const query = useQuery({
     queryKey,
     queryFn: async () => (await api.get<InvestmentDashboardDto>(`/api/v1/properties/${propertyId}/investment?${params}`)).data,
@@ -52,6 +49,7 @@ export function InvestmentTab({ propertyId }: { propertyId: string }) {
     mutationFn: (payload: Record<string, unknown>) => api.post(`/api/v1/properties/${propertyId}/investment`, payload),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["investment", propertyId] });
+      queryClient.invalidateQueries({ queryKey: ["portfolio-investment"] });
       queryClient.invalidateQueries({ queryKey: ["property", propertyId] });
       setRecordKind(null);
       toast.success("Investment record saved");
@@ -70,15 +68,14 @@ export function InvestmentTab({ propertyId }: { propertyId: string }) {
 
   return (
     <TooltipProvider>
-      <div className="space-y-6 pt-4">
+      <div className="space-y-6">
         <div className="flex flex-wrap items-end justify-between gap-3">
           <div>
-            <h3 className="text-lg font-semibold">Investment performance</h3>
+            <h2 className="text-xl font-semibold">{data.property.nickname}</h2>
             <p className="text-sm text-muted-foreground">Actual cash-basis management information · {data.range.from} to {data.range.to}</p>
+            <Link className="text-sm text-primary underline-offset-4 hover:underline" href={`/properties/${propertyId}`}>View property details</Link>
           </div>
           <div className="flex flex-wrap items-end gap-2">
-            <div><Label className="sr-only">Date range</Label><Select value={preset} onValueChange={setPreset}><SelectTrigger><SelectValue /></SelectTrigger><SelectContent>{PRESETS.map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select></div>
-            {preset === "custom" && <><Field label="From"><Input type="date" value={from} onChange={(e) => setFrom(e.target.value)} /></Field><Field label="To"><Input type="date" value={to} onChange={(e) => setTo(e.target.value)} /></Field></>}
             <Button variant="outline" onClick={() => downloadCsv(filteredTransactions)}>Export CSV</Button>
             <Select onValueChange={(value) => setRecordKind(value as RecordKind)}><SelectTrigger><Plus className="size-4" /><SelectValue placeholder="Add record" /></SelectTrigger><SelectContent>{Object.entries(RECORD_LABELS).filter(([value]) => value !== "owner" && value !== "ownership").map(([value, label]) => <SelectItem key={value} value={value}>{label}</SelectItem>)}</SelectContent></Select>
           </div>

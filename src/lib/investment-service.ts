@@ -17,11 +17,112 @@ import {
   type DatedAmount,
   type OwnershipSlice,
 } from "@/lib/investment";
+import { aggregatePortfolioInvestment, type PortfolioInvestmentFact } from "@/lib/portfolio-investment";
+import type { PortfolioInvestmentSummaryDto } from "@/lib/investment-types";
 
 const CONTRIBUTIONS = new Set(["initial_contribution", "additional_contribution", "owner_funded_expense", "adjustment_in"]);
 const RETURNS = new Set(["capital_return", "profit_distribution", "drawing", "adjustment_out"]);
 const OPERATING_INCOME = new Set(["rent", "other"]);
 const money = (value: bigint | number | null | undefined) => value == null ? null : Number(value);
+
+export async function getPortfolioInvestmentSummary(opts: {
+  preset: DateRangePreset;
+  from?: string;
+  to?: string;
+  today: string;
+}): Promise<PortfolioInvestmentSummaryDto> {
+  const properties = await prisma.property.findMany({
+    include: {
+      valuations: { where: { valuedOn: { lte: parseDateOnly(opts.today) } }, orderBy: { valuedOn: "asc" } },
+      loans: { include: { events: { orderBy: { occurredOn: "asc" } } } },
+      ownerInvestmentEntries: true,
+      transactions: { orderBy: { occurredOn: "asc" } },
+    },
+    orderBy: [{ status: "asc" }, { nickname: "asc" }],
+  });
+  const active = properties.filter((property) => property.status === "active");
+  const earliestPurchase = active
+    .map((property) => property.purchaseCompletionDate ? toDateOnly(property.purchaseCompletionDate) : null)
+    .filter((date): date is string => date != null && date <= opts.today)
+    .sort()[0];
+  const range = dateRange({
+    preset: opts.preset,
+    today: opts.today,
+    purchaseDate: earliestPurchase,
+    customFrom: opts.from,
+    customTo: opts.to,
+  });
+
+  const facts: PortfolioInvestmentFact[] = active.map((property) => {
+    const periodTransactions = property.transactions.filter((transaction) =>
+      inRange(toDateOnly(transaction.occurredOn), range.from, range.to)
+    );
+    const rent = periodTransactions.filter((transaction) => transaction.direction === "income" && transaction.category === "rent");
+    const operatingIncome = periodTransactions.filter((transaction) => transaction.direction === "income" && OPERATING_INCOME.has(transaction.category));
+    const operatingExpenses = periodTransactions.filter((transaction) => transaction.direction === "expense" && transaction.category !== "mortgage_interest");
+    const interestTransactions = periodTransactions.filter((transaction) => transaction.direction === "expense" && transaction.category === "mortgage_interest");
+    const allLoanEvents = property.loans.flatMap((loan) => loan.events);
+    const periodLoanEvents = allLoanEvents.filter((event) => inRange(toDateOnly(event.occurredOn), range.from, range.to));
+    const unmatchedInterest = periodLoanEvents.filter((event) =>
+      ["interest", "finance_cost"].includes(event.eventType) &&
+      !interestTransactions.some((transaction) =>
+        toDateOnly(transaction.occurredOn) === toDateOnly(event.occurredOn) &&
+        transaction.amountCents === Number(event.amountCents)
+      )
+    );
+    const principalCents = sumCents(periodLoanEvents.filter((event) => ["principal_repayment", "refinance_out"].includes(event.eventType)).map((event) => Number(event.amountCents)));
+    const interestCents = sumCents(interestTransactions.map((transaction) => transaction.amountCents)) + sumCents(unmatchedInterest.map((event) => Number(event.amountCents)));
+    const grossOperatingIncomeCents = sumCents(operatingIncome.map((transaction) => transaction.amountCents));
+    const operatingExpensesCents = sumCents(operatingExpenses.map((transaction) => transaction.amountCents));
+    const noiCents = grossOperatingIncomeCents - operatingExpensesCents;
+    const currentValueCents = money(property.valuations.at(-1)?.valueCents);
+    const mortgageBalanceCents = sumCents(property.loans.filter((loan) => loan.secured).map((loan) => loanBalance(
+      Number(loan.openingBalanceCents),
+      loan.events.filter((event) => toDateOnly(event.occurredOn) <= opts.today).map((event) => ({ ...event, amountCents: Number(event.amountCents) }))
+    )));
+    const hasCashRecords = property.transactions.length > 0 || allLoanEvents.length > 0;
+    const contributedCents = sumCents(property.ownerInvestmentEntries.filter((entry) => CONTRIBUTIONS.has(entry.entryType)).map((entry) => Number(entry.amountCents)));
+    const returnedCapitalCents = sumCents(property.ownerInvestmentEntries.filter((entry) => entry.entryType === "adjustment_out" || entry.entryType === "capital_return").map((entry) => Number(entry.amountCents)));
+    return {
+      currentValueCents,
+      mortgageBalanceCents,
+      equityCents: currentValueCents == null ? null : currentValueCents - mortgageBalanceCents,
+      cashInvestedCents: property.ownerInvestmentEntries.length ? Math.max(0, contributedCents - returnedCapitalCents) : null,
+      grossRentalIncomeCents: hasCashRecords ? sumCents(rent.map((transaction) => transaction.amountCents)) : null,
+      netOperatingIncomeCents: hasCashRecords ? noiCents : null,
+      netCashFlowCents: hasCashRecords ? noiCents - interestCents - principalCents : null,
+    };
+  });
+  const aggregation = aggregatePortfolioInvestment(facts, range);
+  const metricLabels: Record<keyof typeof aggregation.metrics, string> = {
+    currentValue: "Current estimated value",
+    mortgageBalance: "Mortgage balance",
+    equity: "Current equity",
+    cashInvested: "Total cash invested",
+    grossRentalIncome: "Gross rental income",
+    netOperatingIncome: "Net operating income",
+    netCashFlow: "Net cash flow",
+  };
+  const warnings: string[] = [];
+  for (const [label, metric] of Object.entries(aggregation.metrics)) {
+    if (metric.missingProperties > 0) warnings.push(`${metricLabels[label as keyof typeof aggregation.metrics]} excludes ${metric.missingProperties} ${metric.missingProperties === 1 ? "property" : "properties"} with unavailable data.`);
+  }
+
+  return {
+    range: { ...range, preset: opts.preset },
+    accountingBasis: "cash",
+    propertiesRepresented: active.length,
+    properties: properties.map((property) => ({
+      id: property.id,
+      nickname: property.nickname,
+      address: [property.addressLine1, property.addressLine2, property.city, property.postcode].filter(Boolean).join(", "),
+      status: property.status as "active" | "archived",
+      hasInvestmentData: property.purchasePriceCents != null || property.valuations.length > 0 || property.loans.length > 0 || property.ownerInvestmentEntries.length > 0 || property.transactions.length > 0,
+    })),
+    ...aggregation,
+    warnings,
+  };
+}
 
 export async function getInvestmentDashboard(opts: {
   propertyId: string;

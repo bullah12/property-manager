@@ -61,11 +61,7 @@ const NotificationsTab = dynamic<{ propertyId: string; propertyNickname?: string
 const OwnershipTab = dynamic<{ propertyId: string }>(() => import("./tabs/ownership-tab").then((module) => module.OwnershipTab), {
   loading: TabLoadingSkeleton,
 });
-const InvestmentTab = dynamic<{ propertyId: string }>(() => import("./tabs/investment-tab").then((module) => module.InvestmentTab), {
-  loading: TabLoadingSkeleton,
-});
-
-const TABS = ["ownership", "investment", "contracts", "income", "expenses", "notifications", "tenancy"] as const;
+const TABS = ["ownership", "contracts", "income", "expenses", "notifications", "tenancy"] as const;
 type TabKey = (typeof TABS)[number];
 
 export function PropertyDetail({ id }: { id: string }) {
@@ -220,7 +216,6 @@ export function PropertyDetail({ id }: { id: string }) {
         <TabsList className="flex-wrap">
           <TabsTrigger value="tenancy">Tenancy</TabsTrigger>
           <TabsTrigger value="ownership">Ownership</TabsTrigger>
-          <TabsTrigger value="investment">Investment Performance</TabsTrigger>
           <TabsTrigger value="contracts">Contracts</TabsTrigger>
           <TabsTrigger value="income">Monthly Income</TabsTrigger>
           <TabsTrigger value="expenses">Expenses</TabsTrigger>
@@ -235,9 +230,6 @@ export function PropertyDetail({ id }: { id: string }) {
               propertyId={id}
             />
           ) : null}
-        </TabsContent>
-        <TabsContent value="investment">
-          <InvestmentTab propertyId={id} />
         </TabsContent>
         <TabsContent value="contracts">
           <ContractsTab propertyId={id} />

@@ -2,6 +2,7 @@ import {
   Bell,
   Building2,
   LayoutDashboard,
+  ChartNoAxesCombined,
   Settings,
   Users,
   Wrench,
@@ -20,6 +21,7 @@ export interface NavItem {
 export const navItems: NavItem[] = [
   { title: "Overview", href: "/", icon: LayoutDashboard },
   { title: "Properties", href: "/properties", icon: Building2 },
+  { title: "Investment Performance", href: "/investment-performance", icon: ChartNoAxesCombined },
   { title: "Tenants", href: "/tenants", icon: Users },
   { title: "Contractors", href: "/contractors", icon: Wrench },
   { title: "Notifications", href: "/notifications", icon: Bell, showUnreadBadge: true },
