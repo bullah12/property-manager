@@ -53,6 +53,7 @@ export function requiresWorkspaceContext(pathname: string): boolean {
   const publicRoutes = new Set([
     "/api/v1/auth/login",
     "/api/v1/auth/logout",
+    "/api/v1/auth/signup",
     "/api/v1/health",
   ]);
   return (

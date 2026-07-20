@@ -56,6 +56,7 @@ test("all private v1 APIs are wrapped while public and system routes are not", (
   assert.equal(requiresWorkspaceContext("/api/v1/properties"), true);
   assert.equal(requiresWorkspaceContext("/api/v1/files/id/download"), true);
   assert.equal(requiresWorkspaceContext("/api/v1/auth/login"), false);
+  assert.equal(requiresWorkspaceContext("/api/v1/auth/signup"), false);
   assert.equal(requiresWorkspaceContext("/api/v1/auth/diagnostics"), true);
   assert.equal(requiresWorkspaceContext("/api/v1/health"), false);
   assert.equal(requiresWorkspaceContext("/api/internal/cron/daily-scan"), false);
