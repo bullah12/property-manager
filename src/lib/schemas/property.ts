@@ -2,6 +2,8 @@ import { z } from "zod";
 import { dateOnly } from "@/lib/schemas/tenancy";
 
 export const PROPERTY_TYPES = ["house", "flat", "hmo", "commercial"] as const;
+export const INCOME_BASES = ["gross_property", "owner_share"] as const;
+export const OWNERSHIP_STATUSES = ["verified", "inferred", "pending"] as const;
 
 export const ownerInputSchema = z.object({
   ownerId: z.uuid().optional(),
@@ -60,6 +62,10 @@ export const createPropertySchema = z.object({
   propertyType: z.enum(PROPERTY_TYPES),
   bedrooms: z.number().int().min(0).max(100).nullish(),
   purchasePriceCents: z.number().int().min(0).nullish(),
+  currentMonthlyIncomeCents: z.number().int().min(0).nullish(),
+  potentialMonthlyIncomeCents: z.number().int().min(0).nullish(),
+  incomeBasis: z.enum(INCOME_BASES).optional(),
+  ownershipStatus: z.enum(OWNERSHIP_STATUSES).optional(),
   ownership: propertyOwnershipInputSchema,
   notes: z.string().max(10_000).nullish(),
 });

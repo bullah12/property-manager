@@ -9,6 +9,7 @@ import { useCallback } from "react";
 import { DataTable, type SortState } from "@/components/data-table";
 import { Money } from "@/components/money";
 import { StatusBadge } from "@/components/status-badge";
+import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import {
   Select,
@@ -37,8 +38,23 @@ const columns: ColumnDef<PropertyDto, unknown>[] = [
     ),
   },
   {
-    header: "Landlord",
-    cell: ({ row }) => row.original.mainLandlord?.fullName ?? "—",
+    header: "Ownership",
+    cell: ({ row }) => {
+      const property = row.original;
+      if (property.ownershipStatus === "pending") {
+        return <Badge variant="outline">Shares pending</Badge>;
+      }
+      return (
+        <div>
+          <p>{property.mainLandlord?.fullName ?? "Not set"}</p>
+          <p className="text-xs text-muted-foreground">
+            {property.ownerships
+              .map((owner) => `${owner.ownershipPercentage.toFixed(2)}% ${owner.fullName}`)
+              .join(" · ")}
+          </p>
+        </div>
+      );
+    },
   },
   {
     header: "Type",
@@ -50,8 +66,12 @@ const columns: ColumnDef<PropertyDto, unknown>[] = [
     cell: ({ row }) => row.original.bedrooms ?? "—",
   },
   {
-    header: "Purchase price",
-    cell: ({ row }) => <Money cents={row.original.purchasePriceCents} />,
+    header: "Current / month",
+    cell: ({ row }) => <Money cents={row.original.currentMonthlyIncomeCents} />,
+  },
+  {
+    header: "Potential / month",
+    cell: ({ row }) => <Money cents={row.original.potentialMonthlyIncomeCents} />,
   },
   {
     header: "Status",

@@ -333,6 +333,8 @@ export async function getInvestmentDashboard(opts: {
   if (!property.acquisitionCosts.length) issues.push({ severity: "warning", code: "acquisition_costs", message: "No acquisition costs have been recorded." });
   if (!currentValuation) issues.push({ severity: "error", code: "valuation", message: "A current valuation is required for equity, yield and appreciation." });
   if (!ownerRecords.length) issues.push({ severity: "error", code: "owners", message: "No ownership event has been recorded." });
+  if (property.ownershipStatus === "pending") issues.push({ severity: "error", code: "ownership_pending", message: "Ownership percentages are pending confirmation; owner-level allocations are provisional." });
+  if (property.ownershipStatus === "inferred") issues.push({ severity: "warning", code: "ownership_inferred", message: "Ownership was inferred from the source workbook and should be confirmed against legal records." });
   const currentShares = ownershipAt(ownership, opts.today);
   if (sumCents(currentShares.map((x) => x.percentageBps)) !== 10_000) issues.push({ severity: "error", code: "ownership_total", message: "Ownership effective today does not total 100%." });
   if ([...incomeAllocation.unallocated, ...expenseAllocation.unallocated, ...principalAllocation.unallocated].length) issues.push({ severity: "error", code: "ownership_gap", message: "Some selected-period records cannot be allocated because ownership history is missing or does not total 100%." });

@@ -63,6 +63,10 @@ export interface PropertyDto {
   propertyType: "house" | "flat" | "hmo" | "commercial";
   bedrooms: number | null;
   purchasePriceCents: number | null;
+  currentMonthlyIncomeCents: number | null;
+  potentialMonthlyIncomeCents: number | null;
+  incomeBasis: "gross_property" | "owner_share";
+  ownershipStatus: "verified" | "inferred" | "pending";
   ownershipMode: "sole" | "shared";
   currentOwnershipEventId: string | null;
   ownerships: PropertyOwnershipDto[];

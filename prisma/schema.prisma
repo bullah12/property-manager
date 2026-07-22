@@ -156,6 +156,10 @@ model Property {
   bedrooms           Int?
   purchasePriceCents Int?     @map("purchase_price_cents")
   purchaseCompletionDate DateTime? @map("purchase_completion_date") @db.Date
+  currentMonthlyIncomeCents Int? @map("current_monthly_income_cents")
+  potentialMonthlyIncomeCents Int? @map("potential_monthly_income_cents")
+  incomeBasis        String   @default("gross_property") @map("income_basis")
+  ownershipStatus    String   @default("verified") @map("ownership_status")
   notes              String?
   status             String   @default("active")
   createdAt          DateTime @default(now()) @map("created_at") @db.Timestamptz(6)

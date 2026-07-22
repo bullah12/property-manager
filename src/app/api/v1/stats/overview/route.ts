@@ -21,14 +21,14 @@ export const GET = apiHandler(async () => {
   // for one another's database work. Rent received is one aggregate query,
   // regardless of the number of active tenancies.
   const [activeTenancies, received, ytd, deadlinesDueSoon] = await Promise.all([
-    prisma.tenancy.findMany({ where: { status: "active" } }),
+    prisma.tenancy.findMany({ where: { status: "active", property: { status: "active" } } }),
     prisma.transaction.aggregate({
       _sum: { amountCents: true },
       where: {
         direction: "income",
         category: "rent",
         rentPeriod: currentPeriod,
-        tenancy: { status: "active" },
+        tenancy: { status: "active", property: { status: "active" } },
       },
     }),
     prisma.transaction.aggregate({
@@ -36,6 +36,7 @@ export const GET = apiHandler(async () => {
       where: {
         direction: "expense",
         occurredOn: { gte: parseDateOnly(`${year}-01-01`) },
+        property: { status: "active" },
       },
     }),
     prisma.reminder.count({ where: { dueOn: { lte: soonCutoff } } }),
