@@ -7,6 +7,7 @@ import { serializeTransaction } from "@/lib/serializers";
 export const GET = apiHandler(async () => {
   await requireAdmin();
   const recent = await prisma.transaction.findMany({
+    where: { property: { status: "active" } },
     orderBy: [{ createdAt: "desc" }],
     take: 10,
     include: { property: true, tenancy: { include: { tenant: true } } },

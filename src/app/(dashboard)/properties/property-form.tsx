@@ -54,6 +54,14 @@ const formSchema = z.object({
   purchasePrice: z
     .string()
     .regex(/^(\d+(\.\d{1,2})?)?$/, "Amount in pounds, e.g. 250000 or 250000.00"),
+  currentMonthlyIncome: z
+    .string()
+    .regex(/^(\d+(\.\d{1,2})?)?$/, "Enter a monthly amount in pounds"),
+  potentialMonthlyIncome: z
+    .string()
+    .regex(/^(\d+(\.\d{1,2})?)?$/, "Enter a monthly amount in pounds"),
+  incomeBasis: z.enum(["gross_property", "owner_share"]),
+  ownershipStatus: z.enum(["verified", "inferred", "pending"]),
   ownershipMode: z.enum(["sole", "shared"]),
   ownershipEffectiveFrom: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Required"),
   owners: z.array(ownerFormSchema).min(1),
@@ -98,6 +106,16 @@ export function PropertyForm({ property }: { property?: PropertyDto }) {
         property?.purchasePriceCents != null
           ? (property.purchasePriceCents / 100).toFixed(2)
           : "",
+      currentMonthlyIncome:
+        property?.currentMonthlyIncomeCents != null
+          ? (property.currentMonthlyIncomeCents / 100).toFixed(2)
+          : "",
+      potentialMonthlyIncome:
+        property?.potentialMonthlyIncomeCents != null
+          ? (property.potentialMonthlyIncomeCents / 100).toFixed(2)
+          : "",
+      incomeBasis: property?.incomeBasis ?? "gross_property",
+      ownershipStatus: property?.ownershipStatus ?? "verified",
       ownershipMode: property?.ownershipMode ?? "sole",
       ownershipEffectiveFrom:
         property?.ownerships[0]?.effectiveFrom ?? new Date().toISOString().slice(0, 10),
@@ -142,6 +160,16 @@ export function PropertyForm({ property }: { property?: PropertyDto }) {
           values.purchasePrice === ""
             ? null
             : Math.round(parseFloat(values.purchasePrice) * 100),
+        currentMonthlyIncomeCents:
+          values.currentMonthlyIncome === ""
+            ? null
+            : Math.round(parseFloat(values.currentMonthlyIncome) * 100),
+        potentialMonthlyIncomeCents:
+          values.potentialMonthlyIncome === ""
+            ? null
+            : Math.round(parseFloat(values.potentialMonthlyIncome) * 100),
+        incomeBasis: values.incomeBasis,
+        ownershipStatus: values.ownershipStatus,
         ...(!isEdit
           ? {
               ownership: {
@@ -304,6 +332,67 @@ export function PropertyForm({ property }: { property?: PropertyDto }) {
                     <FormControl>
                       <Input inputMode="decimal" placeholder="250000.00" {...field} />
                     </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="currentMonthlyIncome"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Current monthly income £ (optional)</FormLabel>
+                    <FormControl>
+                      <Input inputMode="decimal" placeholder="850.00" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="potentialMonthlyIncome"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Potential monthly income £ (optional)</FormLabel>
+                    <FormControl>
+                      <Input inputMode="decimal" placeholder="950.00" {...field} />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="incomeBasis"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Income figure represents</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl><SelectTrigger className="w-full"><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="gross_property">Whole property</SelectItem>
+                        <SelectItem value="owner_share">My share</SelectItem>
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+              <FormField
+                control={form.control}
+                name="ownershipStatus"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Ownership confidence</FormLabel>
+                    <Select value={field.value} onValueChange={field.onChange}>
+                      <FormControl><SelectTrigger className="w-full"><SelectValue /></SelectTrigger></FormControl>
+                      <SelectContent>
+                        <SelectItem value="verified">Verified</SelectItem>
+                        <SelectItem value="inferred">Inferred from source</SelectItem>
+                        <SelectItem value="pending">Pending confirmation</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

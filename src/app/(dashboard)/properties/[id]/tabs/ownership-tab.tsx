@@ -19,7 +19,7 @@ const today = () => new Date().toISOString().slice(0, 10);
 const poundsToCents = (value: string) => value ? Math.round(Number(value) * 100) : 0;
 const money = (cents: number, currency = "GBP") => new Intl.NumberFormat("en-GB", { style: "currency", currency }).format(cents / 100);
 
-export function OwnershipTab({ propertyId }: { propertyId: string }) {
+export function OwnershipTab({ propertyId, ownershipStatus }: { propertyId: string; ownershipStatus: "verified" | "inferred" | "pending" }) {
   const queryClient = useQueryClient();
   const [asOf, setAsOf] = useState(today());
   const query = useQuery({
@@ -54,6 +54,16 @@ export function OwnershipTab({ propertyId }: { propertyId: string }) {
           </div>
         </CardHeader>
         <CardContent className="space-y-4">
+          {ownershipStatus !== "verified" ? (
+            <div className="flex gap-2 rounded-md border border-amber-300 bg-amber-50 p-3 text-sm text-amber-950">
+              <AlertTriangle className="mt-0.5 size-4 shrink-0" />
+              <p>
+                {ownershipStatus === "pending"
+                  ? "Share percentages are pending confirmation. Any 100% technical allocation shown here exists only to keep the ledger valid and must not be treated as legal ownership."
+                  : "This split was inferred from formulas in the source workbook. Confirm it against title or partnership records before treating it as verified legal ownership."}
+              </p>
+            </div>
+          ) : null}
           <div className="flex flex-wrap items-end gap-3 rounded-md bg-muted/50 p-3">
             <div><Label htmlFor="ownership-as-of">View ownership on date</Label><Input id="ownership-as-of" type="date" value={asOf} onChange={(event) => setAsOf(event.target.value)} /></div>
             {!currentDate ? <Button variant="outline" onClick={() => setAsOf(today())}>Return to today</Button> : null}

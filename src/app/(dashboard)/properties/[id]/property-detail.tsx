@@ -6,7 +6,6 @@ import dynamic from "next/dynamic";
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { toast } from "sonner";
-import { DateDisplay } from "@/components/date-display";
 import { Money } from "@/components/money";
 import { PanelLoading } from "@/components/panel-loading";
 import { StatusBadge } from "@/components/status-badge";
@@ -58,7 +57,7 @@ const NotificationsTab = dynamic<{ propertyId: string; propertyNickname?: string
   () => import("./tabs/notifications-tab").then((module) => module.NotificationsTab),
   { loading: TabLoadingSkeleton }
 );
-const OwnershipTab = dynamic<{ propertyId: string }>(() => import("./tabs/ownership-tab").then((module) => module.OwnershipTab), {
+const OwnershipTab = dynamic<{ propertyId: string; ownershipStatus: PropertyDetailDto["ownershipStatus"] }>(() => import("./tabs/ownership-tab").then((module) => module.OwnershipTab), {
   loading: TabLoadingSkeleton,
 });
 const TABS = ["ownership", "contracts", "income", "expenses", "notifications", "tenancy"] as const;
@@ -113,7 +112,7 @@ export function PropertyDetail({ id }: { id: string }) {
             {property.bedrooms != null ? ` · ${property.bedrooms} bed` : ""}
           </p>
           <p className="mt-1 text-sm text-muted-foreground">
-            Main landlord: {property.mainLandlord?.fullName ?? "Not set"}
+            Main landlord: {property.ownershipStatus === "pending" ? "Pending confirmation" : property.mainLandlord?.fullName ?? "Not set"}
             {property.mainLandlord?.email ? ` · ${property.mainLandlord.email}` : ""}
             {property.mainLandlord?.phone ? ` · ${property.mainLandlord.phone}` : ""}
           </p>
@@ -172,35 +171,48 @@ export function PropertyDetail({ id }: { id: string }) {
       </div>
 
           {/* Mini-stats */}
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
         <MiniStat
-          label="Current rent"
+          label={property.incomeBasis === "owner_share" ? "Your monthly income" : "Monthly property income"}
           value={
-            property.stats.currentRentCents != null ? (
+            property.currentMonthlyIncomeCents != null ? (
               <>
-                <Money cents={property.stats.currentRentCents} />
+                <Money cents={property.currentMonthlyIncomeCents} />
                 <span className="text-sm font-normal text-muted-foreground"> /month</span>
               </>
             ) : (
-              "Vacant"
+              "Not recorded"
             )
           }
         />
         <MiniStat
-          label="Next deadline"
+          label="Potential monthly income"
           value={
-            property.stats.nextDeadline ? (
-              <DateDisplay iso={property.stats.nextDeadline} />
+            property.potentialMonthlyIncomeCents != null ? (
+              <>
+                <Money cents={property.potentialMonthlyIncomeCents} />
+                <span className="text-sm font-normal text-muted-foreground"> /month</span>
+              </>
             ) : (
-              "None"
+              "Not recorded"
             )
           }
+        />
+        <MiniStat
+          label="Ownership confidence"
+          value={<span className="capitalize">{property.ownershipStatus}</span>}
         />
         <MiniStat
           label="YTD expenses"
           value={<Money cents={property.stats.ytdExpensesCents} />}
         />
           </div>
+          {property.notes ? (
+            <div className="rounded-lg border border-amber-200 bg-amber-50/60 p-3 text-sm text-amber-950">
+              <p className="font-medium">Workbook source notes</p>
+              <p className="mt-1 whitespace-pre-wrap">{property.notes}</p>
+            </div>
+          ) : null}
         </>
       )}
 
@@ -228,6 +240,7 @@ export function PropertyDetail({ id }: { id: string }) {
           {property ? (
             <OwnershipTab
               propertyId={id}
+              ownershipStatus={property.ownershipStatus}
             />
           ) : null}
         </TabsContent>

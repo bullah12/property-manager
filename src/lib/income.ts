@@ -245,7 +245,7 @@ export async function findOverdueRentPeriods(today: string, graceDays: number) {
   );
 
   const tenancies = await prisma.tenancy.findMany({
-    where: { status: "active" },
+    where: { status: "active", property: { status: "active" } },
     include: { tenant: true, property: true },
   });
 

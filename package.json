@@ -20,7 +20,8 @@
     "test:workspace": "tsx --test tests/workspace-isolation.test.ts",
     "test:ownership": "tsx --test tests/property-ownership.test.ts",
     "test:investment": "tsx --test tests/investment.test.ts",
-    "test:portfolio-investment": "tsx --test tests/portfolio-investment.test.ts"
+    "test:portfolio-investment": "tsx --test tests/portfolio-investment.test.ts",
+    "test:source-portfolio": "tsx --test tests/source-portfolio.test.ts"
   },
   "dependencies": {
     "@hookform/resolvers": "^5.4.0",
